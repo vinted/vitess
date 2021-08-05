@@ -55,6 +55,7 @@ type Engine struct {
 
 	// keyspace is initialized by InitDBConfig
 	keyspace string
+	shard    string
 
 	// wg is incremented for every Stream, and decremented on end.
 	// Close waits for all current streams to end by waiting on wg.
@@ -133,8 +134,9 @@ func NewEngine(env tabletenv.Env, ts srvtopo.Server, se *schema.Engine, lagThrot
 }
 
 // InitDBConfig initializes the target parameters for the Engine.
-func (vse *Engine) InitDBConfig(keyspace string) {
+func (vse *Engine) InitDBConfig(keyspace, shard string) {
 	vse.keyspace = keyspace
+	vse.shard = shard
 }
 
 // Open starts the Engine service.
