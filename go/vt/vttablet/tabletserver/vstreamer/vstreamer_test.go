@@ -936,6 +936,10 @@ func TestREKeyRange(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ignoreKeyspaceShardInFieldAndRowEvents = false
+	defer func() {
+		ignoreKeyspaceShardInFieldAndRowEvents = true
+	}()
 	// Needed for this test to run if run standalone
 	engine.watcherOnce.Do(engine.setWatch)
 
@@ -1018,7 +1022,7 @@ func TestREKeyRange(t *testing.T) {
 	execStatements(t, input)
 	expectLog(ctx, t, input, ch, [][]string{{
 		`begin`,
-		`type:ROW row_event:{table_name:"t1" row_changes:{after:{lengths:1 lengths:1 lengths:3 values:"41aaa"}}}`,
+		`type:ROW row_event:{table_name:"t1" row_changes:{after:{lengths:1 lengths:1 lengths:3 values:"41aaa"}} keyspace:"vttest" shard:"0"}`,
 		`gtid`,
 		`commit`,
 	}})
