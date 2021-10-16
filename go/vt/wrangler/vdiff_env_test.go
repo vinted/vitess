@@ -335,7 +335,12 @@ func (tmc *testVDiffTMClient) VReplicationWaitForPos(ctx context.Context, tablet
 	return nil
 }
 
+// TODO(deepthi): remove this after v12.0
 func (tmc *testVDiffTMClient) MasterPosition(ctx context.Context, tablet *topodatapb.Tablet) (string, error) {
+	return tmc.PrimaryPosition(ctx, tablet)
+}
+
+func (tmc *testVDiffTMClient) PrimaryPosition(ctx context.Context, tablet *topodatapb.Tablet) (string, error) {
 	pos, ok := tmc.pos[int(tablet.Alias.Uid)]
 	if !ok {
 		return "", fmt.Errorf("no master position for %d", tablet.Alias.Uid)
