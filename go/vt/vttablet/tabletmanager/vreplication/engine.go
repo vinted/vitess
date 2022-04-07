@@ -82,7 +82,7 @@ func init() {
 
 // this are the default tablet_types that will be used by the tablet picker to find sources for a vreplication stream
 // it can be overridden by passing a different list to the MoveTables or Reshard commands
-var tabletTypesStr = flag.String("vreplication_tablet_type", "MASTER,REPLICA", "comma separated list of tablet types used as a source")
+var tabletTypesStr = flag.String("vreplication_tablet_type", "in_order:REPLICA,MASTER", "comma separated list of tablet types used as a source")
 
 // waitRetryTime can be changed to a smaller value for tests.
 // A VReplication stream can be created by sending an insert statement
@@ -328,8 +328,10 @@ func (vre *Engine) Exec(query string) (*sqltypes.Result, error) {
 // Exec executes the query and the related actions.
 // Example insert statement:
 // insert into _vt.vreplication
+//
 //	(workflow, source, pos, max_tps, max_replication_lag, time_updated, transaction_timestamp, state)
 //	values ('Resharding', 'keyspace:"ks" shard:"0" tables:"a" tables:"b" ', 'MariaDB/0-1-1083', 9223372036854775807, 9223372036854775807, 481823, 0, 'Running')`
+//
 // Example update statement:
 // update _vt.vreplication set state='Stopped', message='testing stop' where id=1
 // Example delete: delete from _vt.vreplication where id=1

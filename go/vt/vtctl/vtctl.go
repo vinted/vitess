@@ -275,87 +275,167 @@ var commands = []commandGroup{
 	},
 	{
 		"Keyspaces", []command{
-			{"CreateKeyspace", commandCreateKeyspace,
-				"[-sharding_column_name=name] [-sharding_column_type=type] [-served_from=tablettype1:ks1,tablettype2:ks2,...] [-force] [-keyspace_type=type] [-base_keyspace=base_keyspace] [-snapshot_time=time] <keyspace name>",
-				"Creates the specified keyspace. keyspace_type can be NORMAL or SNAPSHOT. For a SNAPSHOT keyspace you must specify the name of a base_keyspace, and a snapshot_time in UTC, in RFC3339 time format, e.g. 2006-01-02T15:04:05+00:00"},
-			{"DeleteKeyspace", commandDeleteKeyspace,
-				"[-recursive] <keyspace>",
-				"Deletes the specified keyspace. In recursive mode, it also recursively deletes all shards in the keyspace. Otherwise, there must be no shards left in the keyspace."},
-			{"RemoveKeyspaceCell", commandRemoveKeyspaceCell,
-				"[-force] [-recursive] <keyspace> <cell>",
-				"Removes the cell from the Cells list for all shards in the keyspace, and the SrvKeyspace for that keyspace in that cell."},
-			{"GetKeyspace", commandGetKeyspace,
-				"<keyspace>",
-				"Outputs a JSON structure that contains information about the Keyspace."},
-			{"GetKeyspaces", commandGetKeyspaces,
-				"",
-				"Outputs a sorted list of all keyspaces."},
-			{"SetKeyspaceShardingInfo", commandSetKeyspaceShardingInfo,
-				"[-force] <keyspace name> [<column name>] [<column type>]",
-				"Updates the sharding information for a keyspace."},
-			{"SetKeyspaceServedFrom", commandSetKeyspaceServedFrom,
-				"[-source=<source keyspace name>] [-remove] [-cells=c1,c2,...] <keyspace name> <tablet type>",
-				"Changes the ServedFromMap manually. This command is intended for emergency fixes. This field is automatically set when you call the *MigrateServedFrom* command. This command does not rebuild the serving graph."},
-			{"RebuildKeyspaceGraph", commandRebuildKeyspaceGraph,
-				"[-cells=c1,c2,...] [-allow_partial] <keyspace> ...",
-				"Rebuilds the serving data for the keyspace. This command may trigger an update to all connected clients."},
-			{"ValidateKeyspace", commandValidateKeyspace,
-				"[-ping-tablets] <keyspace name>",
-				"Validates that all nodes reachable from the specified keyspace are consistent."},
-			{"Reshard", commandReshard,
-				"[-cells=<cells>] [-tablet_types=<source_tablet_types>] [-skip_schema_copy] <keyspace.workflow> <source_shards> <target_shards>",
-				"Start a Resharding process. Example: Reshard -cells='zone1,alias1' -tablet_types='master,replica,rdonly'  ks.workflow001 '0' '-80,80-'"},
-			{"MoveTables", commandMoveTables,
-				"[-cells=<cells>] [-tablet_types=<source_tablet_types>] -workflow=<workflow> <source_keyspace> <target_keyspace> <table_specs>",
-				`Move table(s) to another keyspace, table_specs is a list of tables or the tables section of the vschema for the target keyspace. Example: '{"t1":{"column_vindexes": [{"column": "id1", "name": "hash"}]}, "t2":{"column_vindexes": [{"column": "id2", "name": "hash"}]}}'.  In the case of an unsharded target keyspace the vschema for each table may be empty. Example: '{"t1":{}, "t2":{}}'.`},
-			{"Migrate", commandMigrate,
-				"[-cells=<cells>] [-tablet_types=<source_tablet_types>] -workflow=<workflow> <source_keyspace> <target_keyspace> <table_specs>",
-				`Move table(s) to another keyspace, table_specs is a list of tables or the tables section of the vschema for the target keyspace. Example: '{"t1":{"column_vindexes": [{"column": "id1", "name": "hash"}]}, "t2":{"column_vindexes": [{"column": "id2", "name": "hash"}]}}'.  In the case of an unsharded target keyspace the vschema for each table may be empty. Example: '{"t1":{}, "t2":{}}'.`},
-			{"DropSources", commandDropSources,
-				"[-dry_run] [-rename_tables] <keyspace.workflow>",
-				"After a MoveTables or Resharding workflow cleanup unused artifacts like source tables, source shards and blacklists"},
-			{"CreateLookupVindex", commandCreateLookupVindex,
-				"[-cell=<source_cells> DEPRECATED] [-cells=<source_cells>] [-tablet_types=<source_tablet_types>] <keyspace> <json_spec>",
-				`Create and backfill a lookup vindex. the json_spec must contain the vindex and colvindex specs for the new lookup.`},
-			{"ExternalizeVindex", commandExternalizeVindex,
-				"<keyspace>.<vindex>",
-				`Externalize a backfilled vindex.`},
-			{"Materialize", commandMaterialize,
-				`[-cells=<cells>] [-tablet_types=<source_tablet_types>] <json_spec>, example : '{"workflow": "aaa", "source_keyspace": "source", "target_keyspace": "target", "table_settings": [{"target_table": "customer", "source_expression": "select * from customer", "create_ddl": "copy"}]}'`,
-				"Performs materialization based on the json spec. Is used directly to form VReplication rules, with an optional step to copy table structure/DDL."},
-			{"SplitClone", commandSplitClone,
-				"<keyspace> <from_shards> <to_shards>",
-				"Start the SplitClone process to perform horizontal resharding. Example: SplitClone ks '0' '-80,80-'"},
-			{"VerticalSplitClone", commandVerticalSplitClone,
-				"<from_keyspace> <to_keyspace> <tables>",
-				"Start the VerticalSplitClone process to perform vertical resharding. Example: SplitClone from_ks to_ks 'a,/b.*/'"},
-			{"VDiff", commandVDiff,
-				"[-source_cell=<cell>] [-target_cell=<cell>] [-tablet_types=replica] [-filtered_replication_wait_time=30s] <keyspace.workflow>",
-				"Perform a diff of all tables in the workflow"},
-			{"MigrateServedTypes", commandMigrateServedTypes,
-				"[-cells=c1,c2,...] [-reverse] [-skip-refresh-state] [-filtered_replication_wait_time=30s] [-reverse_replication=false] <keyspace/shard> <served tablet type>",
-				"Migrates a serving type from the source shard to the shards that it replicates to. This command also rebuilds the serving graph. The <keyspace/shard> argument can specify any of the shards involved in the migration."},
-			{"MigrateServedFrom", commandMigrateServedFrom,
-				"[-cells=c1,c2,...] [-reverse] [-filtered_replication_wait_time=30s] <destination keyspace/shard> <served tablet type>",
-				"Makes the <destination keyspace/shard> serve the given type. This command also rebuilds the serving graph."},
-			{"SwitchReads", commandSwitchReads,
-				"[-cells=c1,c2,...] [-reverse] -tablet_type={replica|rdonly} [-dry-run] <keyspace.workflow>",
-				"Switch read traffic for the specified workflow."},
-			{"SwitchWrites", commandSwitchWrites,
-				"[-timeout=30s] [-reverse] [-reverse_replication=true] [-dry-run] <keyspace.workflow>",
-				"Switch write traffic for the specified workflow."},
-			{"CancelResharding", commandCancelResharding,
-				"<keyspace/shard>",
-				"Permanently cancels a resharding in progress. All resharding related metadata will be deleted."},
-			{"ShowResharding", commandShowResharding,
-				"<keyspace/shard>",
-				"Displays all metadata about a resharding in progress."},
-			{"FindAllShardsInKeyspace", commandFindAllShardsInKeyspace,
-				"<keyspace>",
-				"Displays all of the shards in the specified keyspace."},
-			{"WaitForDrain", commandWaitForDrain,
-				"[-timeout <duration>] [-retry_delay <duration>] [-initial_wait <duration>] <keyspace/shard> <served tablet type>",
-				"Blocks until no new queries were observed on all tablets with the given tablet type in the specified keyspace. " +
+			{
+				name:   "CreateKeyspace",
+				method: commandCreateKeyspace,
+				params: "[-sharding_column_name=name] [-sharding_column_type=type] [-served_from=tablettype1:ks1,tablettype2:ks2,...] [-force] [-keyspace_type=type] [-base_keyspace=base_keyspace] [-snapshot_time=time] <keyspace name>",
+				help:   "Creates the specified keyspace. keyspace_type can be NORMAL or SNAPSHOT. For a SNAPSHOT keyspace you must specify the name of a base_keyspace, and a snapshot_time in UTC, in RFC3339 time format, e.g. 2006-01-02T15:04:05+00:00",
+			},
+			{
+				name:   "DeleteKeyspace",
+				method: commandDeleteKeyspace,
+				params: "[-recursive] <keyspace>",
+				help:   "Deletes the specified keyspace. In recursive mode, it also recursively deletes all shards in the keyspace. Otherwise, there must be no shards left in the keyspace.",
+			},
+			{
+				name:   "RemoveKeyspaceCell",
+				method: commandRemoveKeyspaceCell,
+				params: "[-force] [-recursive] <keyspace> <cell>",
+				help:   "Removes the cell from the Cells list for all shards in the keyspace, and the SrvKeyspace for that keyspace in that cell.",
+			},
+			{
+				name:   "GetKeyspace",
+				method: commandGetKeyspace,
+				params: "<keyspace>",
+				help:   "Outputs a JSON structure that contains information about the Keyspace.",
+			},
+			{
+				name:   "GetKeyspaces",
+				method: commandGetKeyspaces,
+				params: "",
+				help:   "Outputs a sorted list of all keyspaces.",
+			},
+			{
+				name:   "SetKeyspaceShardingInfo",
+				method: commandSetKeyspaceShardingInfo,
+				params: "[-force] <keyspace name> [<column name>] [<column type>]",
+				help:   "Updates the sharding information for a keyspace.",
+			},
+			{
+				name:   "SetKeyspaceServedFrom",
+				method: commandSetKeyspaceServedFrom,
+				params: "[-source=<source keyspace name>] [-remove] [-cells=c1,c2,...] <keyspace name> <tablet type>",
+				help:   "Changes the ServedFromMap manually. This command is intended for emergency fixes. This field is automatically set when you call the *MigrateServedFrom* command. This command does not rebuild the serving graph.",
+			},
+			{
+				name:   "RebuildKeyspaceGraph",
+				method: commandRebuildKeyspaceGraph,
+				params: "[-cells=c1,c2,...] [-allow_partial] <keyspace> ...",
+				help:   "Rebuilds the serving data for the keyspace. This command may trigger an update to all connected clients.",
+			},
+			{
+				name:   "ValidateKeyspace",
+				method: commandValidateKeyspace,
+				params: "[-ping-tablets] <keyspace name>",
+				help:   "Validates that all nodes reachable from the specified keyspace are consistent.",
+			},
+			{
+				name:   "Reshard",
+				method: commandReshard,
+				params: "[-source_shards=<source_shards>] [-target_shards=<target_shards>] [-cells=<cells>] [-tablet_types=<source_tablet_types>]  [-skip_schema_copy] <action> 'action must be one of the following: Create, Complete, Cancel, SwitchTraffic, ReverseTrafffic, Show, or Progress' <keyspace.workflow>",
+				help:   "Start a Resharding process. Example: Reshard -cells='zone1,alias1' -tablet_types='MASTER,REPLICA,RDONLY'  ks.workflow001 '0' '-80,80-'",
+			},
+			{
+				name:   "MoveTables",
+				method: commandMoveTables,
+				params: "[-source=<sourceKs>] [-tables=<tableSpecs>] [-cells=<cells>] [-tablet_types=<source_tablet_types>] [-all] [-exclude=<tables>] [-auto_start] [-stop_after_copy] <action> 'action must be one of the following: Create, Complete, Cancel, SwitchTraffic, ReverseTrafffic, Show, or Progress' <targetKs.workflow>",
+				help:   `Move table(s) to another keyspace, table_specs is a list of tables or the tables section of the vschema for the target keyspace. Example: '{"t1":{"column_vindexes": [{"column": "id1", "name": "hash"}]}, "t2":{"column_vindexes": [{"column": "id2", "name": "hash"}]}}'.  In the case of an unsharded target keyspace the vschema for each table may be empty. Example: '{"t1":{}, "t2":{}}'.`,
+			},
+			{
+				name:   "Migrate",
+				method: commandMigrate,
+				params: "[-cells=<cells>] [-tablet_types=<source_tablet_types>] -workflow=<workflow> <source_keyspace> <target_keyspace> <table_specs>",
+				help:   `Move table(s) to another keyspace, table_specs is a list of tables or the tables section of the vschema for the target keyspace. Example: '{"t1":{"column_vindexes": [{"column": "id1", "name": "hash"}]}, "t2":{"column_vindexes": [{"column": "id2", "name": "hash"}]}}'.  In the case of an unsharded target keyspace the vschema for each table may be empty. Example: '{"t1":{}, "t2":{}}'.`,
+			},
+			{
+				name:   "DropSources",
+				method: commandDropSources,
+				params: "[-dry_run] [-rename_tables] <keyspace.workflow>",
+				help:   "After a MoveTables or Resharding workflow cleanup unused artifacts like source tables, source shards and blacklists",
+			},
+			{
+				name:   "CreateLookupVindex",
+				method: commandCreateLookupVindex,
+				params: "[-cell=<source_cells> DEPRECATED] [-cells=<source_cells>] [-tablet_types=<source_tablet_types>] <keyspace> <json_spec>",
+				help:   `Create and backfill a lookup vindex. the json_spec must contain the vindex and colvindex specs for the new lookup.`,
+			},
+			{
+				name:   "ExternalizeVindex",
+				method: commandExternalizeVindex,
+				params: "<keyspace>.<vindex>",
+				help:   `Externalize a backfilled vindex.`,
+			},
+			{
+				name:   "Materialize",
+				method: commandMaterialize,
+				params: `[-cells=<cells>] [-tablet_types=<source_tablet_types>] <json_spec>, example : '{"workflow": "aaa", "source_keyspace": "source", "target_keyspace": "target", "table_settings": [{"target_table": "customer", "source_expression": "select * from customer", "create_ddl": "copy"}]}'`,
+				help:   "Performs materialization based on the json spec. Is used directly to form VReplication rules, with an optional step to copy table structure/DDL.",
+			},
+			{
+				name:   "SplitClone",
+				method: commandSplitClone,
+				params: "<keyspace> <from_shards> <to_shards>",
+				help:   "Start the SplitClone process to perform horizontal resharding. Example: SplitClone ks '0' '-80,80-'",
+			},
+			{
+				name:   "VerticalSplitClone",
+				method: commandVerticalSplitClone,
+				params: "<from_keyspace> <to_keyspace> <tables>",
+				help:   "Start the VerticalSplitClone process to perform vertical resharding. Example: SplitClone from_ks to_ks 'a,/b.*/'",
+			},
+			{
+				name:   "VDiff",
+				method: commandVDiff,
+				params: "[-source_cell=<cell>] [-target_cell=<cell>] [-tablet_types=MASTER,REPLICA,RDONLY] [-filtered_replication_wait_time=30s] <keyspace.workflow>",
+				help:   "Perform a diff of all tables in the workflow",
+			},
+			{
+				name:   "MigrateServedTypes",
+				method: commandMigrateServedTypes,
+				params: "[-cells=c1,c2,...] [-reverse] [-skip-refresh-state] [-filtered_replication_wait_time=30s] [-reverse_replication=false] <keyspace/shard> <served tablet type>",
+				help:   "Migrates a serving type from the source shard to the shards that it replicates to. This command also rebuilds the serving graph. The <keyspace/shard> argument can specify any of the shards involved in the migration.",
+			},
+			{
+				name:   "MigrateServedFrom",
+				method: commandMigrateServedFrom,
+				params: "[-cells=c1,c2,...] [-reverse] [-filtered_replication_wait_time=30s] <destination keyspace/shard> <served tablet type>",
+				help:   "Makes the <destination keyspace/shard> serve the given type. This command also rebuilds the serving graph.",
+			},
+			{
+				name:   "SwitchReads",
+				method: commandSwitchReads,
+				params: "[-cells=c1,c2,...] [-reverse] -tablet_type={replica|rdonly} [-dry-run] <keyspace.workflow>",
+				help:   "Switch read traffic for the specified workflow.",
+			},
+			{
+				name:   "SwitchWrites",
+				method: commandSwitchWrites,
+				params: "[-timeout=30s] [-reverse] [-reverse_replication=true] [-dry-run] <keyspace.workflow>",
+				help:   "Switch write traffic for the specified workflow.",
+			},
+			{
+				name:   "CancelResharding",
+				method: commandCancelResharding,
+				params: "<keyspace/shard>",
+				help:   "Permanently cancels a resharding in progress. All resharding related metadata will be deleted.",
+			},
+			{
+				name:   "ShowResharding",
+				method: commandShowResharding,
+				params: "<keyspace/shard>",
+				help:   "Displays all metadata about a resharding in progress.",
+			},
+			{
+				name:   "FindAllShardsInKeyspace",
+				method: commandFindAllShardsInKeyspace,
+				params: "<keyspace>",
+				help:   "Displays all of the shards in the specified keyspace.",
+			},
+			{
+				name:   "WaitForDrain",
+				method: commandWaitForDrain,
+				params: "[-timeout <duration>] [-retry_delay <duration>] [-initial_wait <duration>] <keyspace/shard> <served tablet type>",
+				help: "Blocks until no new queries were observed on all tablets with the given tablet type in the specified keyspace. " +
 					" This can be used as sanity check to ensure that the tablets were drained after running vtctl MigrateServedTypes " +
 					" and vtgate is no longer using them. If -timeout is set, it fails when the timeout is reached."},
 			{"Mount", commandMount,
@@ -1880,7 +1960,7 @@ func commandMoveTables(ctx context.Context, wr *wrangler.Wrangler, subFlags *fla
 
 	workflow := subFlags.String("workflow", "", "Workflow name. Can be any descriptive string. Will be used to later migrate traffic via SwitchReads/SwitchWrites.")
 	cells := subFlags.String("cells", "", "Cell(s) or CellAlias(es) (comma-separated) to replicate from.")
-	tabletTypes := subFlags.String("tablet_types", "", "Source tablet types to replicate from (e.g. master, replica, rdonly). Defaults to -vreplication_tablet_type parameter value for the tablet, which has the default value of replica.")
+	tabletTypes := subFlags.String("tablet_types", "", "Source tablet types to replicate from (e.g. MASTER, REPLICA, RDONLY). Defaults to --vreplication_tablet_type parameter value for the tablet, which has the default value of in_order:REPLICA,MASTER.")
 	allTables := subFlags.Bool("all", false, "Move all tables from the source keyspace")
 	excludes := subFlags.String("exclude", "", "Tables to exclude (comma-separated) if -all is specified")
 
@@ -1947,7 +2027,7 @@ func commandVRWorkflow(ctx context.Context, wr *wrangler.Wrangler, subFlags *fla
 	workflowType wrangler.VReplicationWorkflowType) error {
 
 	cells := subFlags.String("cells", "", "Cell(s) or CellAlias(es) (comma-separated) to replicate from.")
-	tabletTypes := subFlags.String("tablet_types", "master,replica,rdonly", "Source tablet types to replicate from (e.g. master, replica, rdonly). Defaults to -vreplication_tablet_type parameter value for the tablet, which has the default value of replica.")
+	tabletTypes := subFlags.String("tablet_types", "in_order:REPLICA,MASTER", "Source tablet types to replicate from (e.g. MASTER, REPLICA, RDONLY). Defaults to --vreplication_tablet_type parameter value for the tablet, which has the default value of in_order:REPLICA,MASTER.")
 	dryRun := subFlags.Bool("dry_run", false, "Does a dry run of SwitchReads and only reports the actions to be taken. -dry_run is only supported for SwitchTraffic, ReverseTraffic and Complete.")
 	timeout := subFlags.Duration("timeout", 30*time.Second, "Specifies the maximum time to wait, in seconds, for vreplication to catch up on master migrations. The migration will be cancelled on a timeout.")
 	reverseReplication := subFlags.Bool("reverse_replication", true, "Also reverse the replication")
@@ -2101,7 +2181,7 @@ func commandVRWorkflow(ctx context.Context, wr *wrangler.Wrangler, subFlags *fla
 		vrwp.Cells = *cells
 		vrwp.TabletTypes = *tabletTypes
 		if vrwp.TabletTypes == "" {
-			vrwp.TabletTypes = "master,replica,rdonly"
+			vrwp.TabletTypes = "in_order:REPLICA,MASTER"
 		}
 		vrwp.Timeout = *timeout
 		vrwp.EnableReverseReplication = *reverseReplication
@@ -2353,9 +2433,9 @@ func commandVerticalSplitClone(ctx context.Context, wr *wrangler.Wrangler, subFl
 }
 
 func commandVDiff(ctx context.Context, wr *wrangler.Wrangler, subFlags *flag.FlagSet, args []string) error {
-	sourceCell := subFlags.String("source_cell", "", "The source cell to compare from")
-	targetCell := subFlags.String("target_cell", "", "The target cell to compare with")
-	tabletTypes := subFlags.String("tablet_types", "master,replica,rdonly", "Tablet types for source and target")
+	sourceCell := subFlags.String("source_cell", "", "The source cell to compare from; default is any available cell")
+	targetCell := subFlags.String("target_cell", "", "The target cell to compare with; default is any available cell")
+	tabletTypes := subFlags.String("tablet_types", "in_order:RDONLY,REPLICA,MASTER", "Tablet types for source and target")
 	filteredReplicationWaitTime := subFlags.Duration("filtered_replication_wait_time", 30*time.Second, "Specifies the maximum time to wait, in seconds, for filtered replication to catch up on master migrations. The migration will be cancelled on a timeout.")
 	maxRows := subFlags.Int64("limit", math.MaxInt64, "Max rows to stop comparing after")
 	debugQuery := subFlags.Bool("debug_query", false, "Adds a mysql query to the report that can be used for further debugging")
@@ -2398,7 +2478,7 @@ func splitKeyspaceWorkflow(in string) (keyspace, workflow string, err error) {
 func commandMigrateServedTypes(ctx context.Context, wr *wrangler.Wrangler, subFlags *flag.FlagSet, args []string) error {
 	cellsStr := subFlags.String("cells", "", "Specifies a comma-separated list of cells to update")
 	reverse := subFlags.Bool("reverse", false, "Moves the served tablet type backward instead of forward.")
-	skipReFreshState := subFlags.Bool("skip-refresh-state", false, "Skips refreshing the state of the source tablets after the migration, meaning that the refresh will need to be done manually, replica and rdonly only)")
+	skipReFreshState := subFlags.Bool("skip-refresh-state", false, "Skips refreshing the state of the source tablets after the migration, meaning that the refresh will need to be done manually, REPLICA and RDONLY only)")
 	filteredReplicationWaitTime := subFlags.Duration("filtered_replication_wait_time", 30*time.Second, "Specifies the maximum time to wait, in seconds, for filtered replication to catch up on master migrations. The migration will be cancelled on a timeout.")
 	reverseReplication := subFlags.Bool("reverse_replication", false, "For master migration, enabling this flag reverses replication which allows you to rollback")
 	if err := subFlags.Parse(args); err != nil {
@@ -3644,7 +3724,8 @@ func printJSON(logger logutil.Logger, val interface{}) error {
 // mixed protobuf and non-protobuf).
 //
 // TODO(mberlin): Switch "EnumAsInts" to "false" once the frontend is
-//                updated and mixed types will use jsonpb as well.
+//
+//	updated and mixed types will use jsonpb as well.
 func MarshalJSON(obj interface{}) (data []byte, err error) {
 	switch obj := obj.(type) {
 	case proto.Message:
