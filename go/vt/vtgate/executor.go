@@ -398,7 +398,7 @@ func (e *Executor) handleCommit(ctx context.Context, safeSession *SafeSession, l
 	return &sqltypes.Result{}, err
 }
 
-//Commit commits the existing transactions
+// Commit commits the existing transactions
 func (e *Executor) Commit(ctx context.Context, safeSession *SafeSession) error {
 	return e.txConn.Commit(ctx, safeSession)
 }

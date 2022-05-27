@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -69,6 +70,7 @@ type vstream struct {
 	tabletType topodatapb.TabletType
 	filter     *binlogdatapb.Filter
 	resolver   *srvtopo.Resolver
+	optCells   string
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -136,6 +138,7 @@ func (vsm *vstreamManager) VStream(ctx context.Context, tabletType topodatapb.Ta
 	vs := &vstream{
 		vgtid:              vgtid,
 		tabletType:         tabletType,
+		optCells:           flags.Cells,
 		filter:             filter,
 		send:               send,
 		resolver:           vsm.resolver,
@@ -407,6 +410,21 @@ func (vs *vstream) alignStreams(ctx context.Context, event *binlogdatapb.VEvent,
 	}
 }
 
+func (vs *vstream) getCells() []string {
+	var cells []string
+	if vs.optCells != "" {
+		for _, cell := range strings.Split(strings.TrimSpace(vs.optCells), ",") {
+			cells = append(cells, strings.TrimSpace(cell))
+		}
+	}
+
+	if len(cells) == 0 {
+		// use the vtgate's cell by default
+		cells = append(cells, vs.vsm.cell)
+	}
+	return cells
+}
+
 // streamFromTablet streams from one shard. If transactions come in separate chunks, they are grouped and sent.
 func (vs *vstream) streamFromTablet(ctx context.Context, sgtid *binlogdatapb.ShardGtid) error {
 	// journalDone is assigned a channel when a journal event is encountered.
@@ -428,7 +446,8 @@ func (vs *vstream) streamFromTablet(ctx context.Context, sgtid *binlogdatapb.Sha
 
 		var eventss [][]*binlogdatapb.VEvent
 		var err error
-		tp, err := discovery.NewTabletPicker(vs.ts, []string{vs.vsm.cell}, sgtid.Keyspace, sgtid.Shard, vs.tabletType.String())
+		cells := vs.getCells()
+		tp, err := discovery.NewTabletPicker(vs.ts, cells, sgtid.Keyspace, sgtid.Shard, vs.tabletType.String())
 		if err != nil {
 			log.Errorf(err.Error())
 			return err
@@ -438,7 +457,8 @@ func (vs *vstream) streamFromTablet(ctx context.Context, sgtid *binlogdatapb.Sha
 			log.Errorf(err.Error())
 			return err
 		}
-		log.Infof("Picked tablet %s for for %s/%s/%s/%s", tablet.Alias.String(), vs.vsm.cell, sgtid.Keyspace, sgtid.Shard, vs.tabletType.String())
+		log.Infof("Picked tablet %s for for %s/%s/%s/%s", tablet.Alias.String(), strings.Join(cells, ","),
+			sgtid.Keyspace, sgtid.Shard, vs.tabletType.String())
 		target := &querypb.Target{
 			Keyspace:   sgtid.Keyspace,
 			Shard:      sgtid.Shard,

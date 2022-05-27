@@ -72,7 +72,7 @@ type iExecute interface {
 	VSchema() *vindexes.VSchema
 }
 
-//VSchemaOperator is an interface to Vschema Operations
+// VSchemaOperator is an interface to Vschema Operations
 type VSchemaOperator interface {
 	GetCurrentSrvVschema() *vschemapb.SrvVSchema
 	UpdateVSchema(ctx context.Context, ksName string, vschema *vschemapb.SrvVSchema) error
@@ -510,7 +510,7 @@ func (vc *vcursorImpl) SetSysVar(name string, expr string) {
 	vc.safeSession.SetSystemVariable(name, expr)
 }
 
-//NeedsReservedConn implements the SessionActions interface
+// NeedsReservedConn implements the SessionActions interface
 func (vc *vcursorImpl) NeedsReservedConn() {
 	vc.safeSession.SetReservedConn(true)
 }
