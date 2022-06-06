@@ -2027,11 +2027,11 @@ func commandVRWorkflow(ctx context.Context, wr *wrangler.Wrangler, subFlags *fla
 	workflowType wrangler.VReplicationWorkflowType) error {
 
 	cells := subFlags.String("cells", "", "Cell(s) or CellAlias(es) (comma-separated) to replicate from.")
-	tabletTypes := subFlags.String("tablet_types", "in_order:REPLICA,MASTER", "Source tablet types to replicate from (e.g. MASTER, REPLICA, RDONLY). Defaults to --vreplication_tablet_type parameter value for the tablet, which has the default value of in_order:REPLICA,MASTER.")
-	dryRun := subFlags.Bool("dry_run", false, "Does a dry run of SwitchReads and only reports the actions to be taken. -dry_run is only supported for SwitchTraffic, ReverseTraffic and Complete.")
-	timeout := subFlags.Duration("timeout", 30*time.Second, "Specifies the maximum time to wait, in seconds, for vreplication to catch up on master migrations. The migration will be cancelled on a timeout.")
-	reverseReplication := subFlags.Bool("reverse_replication", true, "Also reverse the replication")
-	keepData := subFlags.Bool("keep_data", false, "Do not drop tables or shards (if true, only vreplication artifacts are cleaned up)")
+	tabletTypes := subFlags.String("tablet_types", "in_order:REPLICA,MASTER", "Source tablet types to replicate from (e.g. MASTER, REPLICA, RDONLY). Defaults to --vreplication_tablet_type parameter value for the tablet, which has the default value of in_order:REPLICA,MASTER. Note: SwitchTraffic overrides this default and uses in_order:RDONLY,REPLICA,MASTER to switch all traffic by default.")
+	dryRun := subFlags.Bool("dry_run", false, "Does a dry run of SwitchReads and only reports the actions to be taken. --dry_run is only supported for SwitchTraffic, ReverseTraffic and Complete.")
+	timeout := subFlags.Duration("timeout", 30*time.Second, "Specifies the maximum time to wait, in seconds, for vreplication to catch up on master migrations. The migration will be cancelled on a timeout. --timeout is only supported for SwitchTraffic and ReverseTraffic.")
+	reverseReplication := subFlags.Bool("reverse_replication", true, "Also reverse the replication (default true). --reverse_replication is only supported for SwitchTraffic.")
+	keepData := subFlags.Bool("keep_data", false, "Do not drop tables or shards (if true, only vreplication artifacts are cleaned up).  --keep_data is only supported for Complete and Cancel.")
 
 	autoStart := subFlags.Bool("auto_start", true, "If false, streams will start in the Stopped state and will need to be explicitly started")
 	stopAfterCopy := subFlags.Bool("stop_after_copy", false, "Streams will be stopped once the copy phase is completed")
@@ -2179,9 +2179,12 @@ func commandVRWorkflow(ctx context.Context, wr *wrangler.Wrangler, subFlags *fla
 		vrwp.TabletTypes = *tabletTypes
 	case vReplicationWorkflowActionSwitchTraffic, vReplicationWorkflowActionReverseTraffic:
 		vrwp.Cells = *cells
-		vrwp.TabletTypes = *tabletTypes
-		if vrwp.TabletTypes == "" {
-			vrwp.TabletTypes = "in_order:REPLICA,MASTER"
+		if userPassedFlag(subFlags, "tablet_types") {
+			vrwp.TabletTypes = *tabletTypes
+		} else {
+			// When no tablet types are specified we are supposed to switch all traffic so
+			// we override the normal default for tablet_types.
+			vrwp.TabletTypes = "in_order:RDONLY,REPLICA,MASTER"
 		}
 		vrwp.Timeout = *timeout
 		vrwp.EnableReverseReplication = *reverseReplication
@@ -3805,4 +3808,16 @@ func PrintAllCommands(logger logutil.Logger) {
 		}
 		logger.Printf("\n")
 	}
+}
+
+// userPassedFlag returns true if the flag name given was provided
+// as a command-line argument by the user.
+func userPassedFlag(flags *flag.FlagSet, name string) bool {
+	passed := false
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			passed = true
+		}
+	})
+	return passed
 }
