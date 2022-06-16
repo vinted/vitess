@@ -112,6 +112,11 @@ func buildDMLPlan(vschema ContextVSchema, dmlType string, stmt sqlparser.Stateme
 		return nil, nil, "", err
 	}
 	edml.Keyspace = rb.eroute.Keyspace
+	// FIX HERE, MOVE HERE
+	for _, tval := range pb.st.tables {
+		// There is only one table.
+		edml.Table = tval.vschemaTable
+	}
 	if !edml.Keyspace.Sharded {
 		// We only validate non-table subexpressions because the previous analysis has already validated them.
 		var subqueryArgs []sqlparser.SQLNode
@@ -147,10 +152,7 @@ func buildDMLPlan(vschema ContextVSchema, dmlType string, stmt sqlparser.Stateme
 	if len(pb.st.tables) != 1 {
 		return nil, nil, "", vterrors.Errorf(vtrpcpb.Code_UNIMPLEMENTED, "multi-table %s statement is not supported in sharded database", dmlType)
 	}
-	for _, tval := range pb.st.tables {
-		// There is only one table.
-		edml.Table = tval.vschemaTable
-	}
+	// REMOVE HERE
 
 	routingType, ksidVindex, ksidCol, vindex, values, err := getDMLRouting(where, edml.Table)
 	if err != nil {
