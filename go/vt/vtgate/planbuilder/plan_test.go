@@ -174,6 +174,7 @@ func TestPlan(t *testing.T) {
 	// the column is named as Id. This is to make sure that
 	// column names are case-preserved, but treated as
 	// case-insensitive even if they come from the vschema.
+	
 	testFile(t, "aggr_cases.txt", testOutputTempDir, vschemaWrapper, true)
 	testFile(t, "dml_cases.txt", testOutputTempDir, vschemaWrapper, true)
 	testFile(t, "from_cases.txt", testOutputTempDir, vschemaWrapper, true)
