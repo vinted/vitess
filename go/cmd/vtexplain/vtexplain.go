@@ -31,6 +31,7 @@ import (
 var (
 	sqlFlag            = flag.String("sql", "", "A list of semicolon-delimited SQL commands to analyze")
 	sqlFileFlag        = flag.String("sql-file", "", "Identifies the file that contains the SQL commands to analyze")
+	inputMode          = flag.String("input-mode", "text", "SQL input in text or json (vtgate format) mode")
 	schemaFlag         = flag.String("schema", "", "The SQL table schema")
 	schemaFileFlag     = flag.String("schema-file", "", "Identifies the file that contains the SQL table schema")
 	vschemaFlag        = flag.String("vschema", "", "Identifies the VTGate routing schema")
@@ -46,6 +47,7 @@ var (
 
 	// vtexplainFlags lists all the flags that should show in usage
 	vtexplainFlags = []string{
+		"input-mode",
 		"output-mode",
 		"normalize",
 		"shards",
@@ -182,9 +184,20 @@ func parseAndRun() error {
 		return err
 	}
 
-	plans, err := vtexplain.Run(sql)
-	if err != nil {
-		return err
+	var plans []*vtexplain.Explain
+	switch *inputMode {
+	case "text":
+		plans, err = vtexplain.Run(sql)
+		if err != nil {
+			return err
+		}
+	case "json":
+		plans, err = vtexplain.RunFromJSON(sql)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("invalid input-mode: %s", *inputMode)
 	}
 
 	if *outputMode == "text" {

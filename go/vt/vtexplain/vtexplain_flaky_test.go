@@ -246,6 +246,74 @@ func TestJSONOutput(t *testing.T) {
 	}
 }
 
+func TestJSONInput(t *testing.T) {
+	initTest(ModeMulti, defaultTestOpts(), &testopts{}, t)
+
+	testJSONInputcases := []struct {
+		message     string
+		wantExplain Explain
+	}{
+		{
+			message: `{
+				"SQL": "select user.* from user where id = :vtg1 limit :vtg2",
+				"BindVars": {
+					"vtg1": {
+						"type": "INT64",
+						"value": 2
+					},
+					"vtg2": {
+						"type": "INT64",
+						"value": 1
+					}
+				}
+			}`,
+			wantExplain: Explain{
+				SQL: "select `user`.* from `user` where id = 2 limit 1",
+			},
+		},
+		{
+			message: `{
+				"SQL": "select t1.* from t1 where id in ::vtg1",
+				"BindVars": {
+					"vtg1": {
+						"type": "TUPLE",
+						"values": [{"type": "INT64", "value":1},{"type": "INT64", "value":2}]
+					}
+				}
+			}`,
+			wantExplain: Explain{
+				SQL: "select t1.* from t1 where id in (1, 2)",
+			},
+		},
+		{
+			message: `{
+				"SQL": "insert into t1(id, intval) values (:vtg1, :vtg2)",
+				"BindVars": {
+					"vtg1": {
+						"type": "INT64",
+						"value": 13
+					},
+					"vtg2": {
+						"type": "INT64",
+						"value": 12
+					},
+				},
+			}
+			`,
+			wantExplain: Explain{
+				SQL: "insert into t1(id, intval) values (13, 12)",
+			},
+		},
+	}
+
+	for _, tcase := range testJSONInputcases {
+		singleLineMessage := strings.ReplaceAll(tcase.message, "\n", "")
+		explains, err := RunFromJSON(singleLineMessage)
+		require.NoError(t, err, "vtexplain error")
+		require.Equal(t, tcase.wantExplain.SQL, explains[0].SQL)
+	}
+}
+
 func testShardInfo(ks, start, end string, t *testing.T) *topo.ShardInfo {
 	kr, err := key.ParseKeyRangeParts(start, end)
 	require.NoError(t, err)

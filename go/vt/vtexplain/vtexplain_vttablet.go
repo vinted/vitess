@@ -393,6 +393,15 @@ func newTabletEnvironment(ddls []sqlparser.DDLStatement, opts *Options) (*tablet
 			),
 			"Innodb_rows|0",
 		),
+		"SELECT\n\t\t\tcount(*) as count_ready\n\t\tFROM _vt.schema_migrations\n\t\tWHERE\n\t\t\tmigration_status='ready'\n\t": {
+			Fields: []*querypb.Field{{
+				Name: "count_ready",
+				Type: sqltypes.Uint64,
+			}},
+			Rows: [][]sqltypes.Value{
+				{sqltypes.NewVarBinary("0")},
+			},
+		},
 	}
 
 	for _, query := range onlineddl.ApplyDDL {
@@ -409,7 +418,7 @@ func newTabletEnvironment(ddls []sqlparser.DDLStatement, opts *Options) (*tablet
 		spec := ddl.GetTableSpec()
 		if spec != nil {
 			for _, option := range spec.Options {
-				if option.Name == "comment" && string(option.Value.Val) == "vitess_sequence" {
+				if strings.ToUpper(option.Name) == "COMMENT" && string(option.Value.Val) == "vitess_sequence" {
 					options = "vitess_sequence"
 				}
 			}
@@ -508,7 +517,14 @@ func (t *explainTablet) HandleQuery(c *mysql.Conn, query string, callback func(*
 		if len(selStmt.From) != 1 {
 			return fmt.Errorf("unsupported select with multiple from clauses")
 		}
-
+		if isMetadataSelect(selStmt.From[0]) {
+			return callback(
+				&sqltypes.Result{
+					Fields: []*querypb.Field{{Type: sqltypes.Uint64}},
+					Rows:   [][]sqltypes.Value{},
+				},
+			)
+		}
 		tables := getTables(selStmt.From[0])
 		colTypeMap := map[string]querypb.Type{}
 		for _, table := range tables {
@@ -620,6 +636,17 @@ func (t *explainTablet) HandleQuery(c *mysql.Conn, query string, callback func(*
 	}
 
 	return callback(result)
+}
+
+// Check if query is selecting from metadata databases
+func isMetadataSelect(node sqlparser.SQLNode) bool {
+	switch expr := node.(type) {
+	case *sqlparser.AliasedTableExpr:
+		if n, ok := expr.Expr.(sqlparser.TableName); ok && n.Qualifier.String() == "_vt" {
+			return true
+		}
+	}
+	return false
 }
 
 func getTables(node sqlparser.SQLNode) []sqlparser.TableIdent {

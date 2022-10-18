@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buger/jsonparser"
+
 	"vitess.io/vitess/go/jsonutil"
 	"vitess.io/vitess/go/sync2"
 	"vitess.io/vitess/go/vt/log"
@@ -272,6 +274,132 @@ func Run(sql string) ([]*Explain, error) {
 		if sql == "" {
 			break
 		}
+	}
+
+	return explains, nil
+}
+
+// Replaces SQL bind variable tokens with values
+func formatSQLWithBind(sql string, bindVars map[string]*querypb.BindVariable) (string, error) {
+	tree, err := sqlparser.Parse(sql)
+	if err != nil {
+		return "", fmt.Errorf("parse failed for %s: %v", sql, err)
+	}
+	buf := sqlparser.NewTrackedBuffer(nil)
+	buf.Myprintf("%v", tree)
+	pq := buf.ParsedQuery()
+	bytes, err := pq.GenerateQuery(bindVars, nil)
+	if err != nil {
+		return "", fmt.Errorf("parse err: '%s'", err)
+	}
+	return string(bytes), nil
+}
+
+// Parse SQL from vtgate query log json mesage based on 'SQL' and 'BindVars' fields
+func parseJSONQuery(message string) (string, error) {
+	json := []byte(message)
+	// Extract SQL field
+	sql, err := jsonparser.GetString(json, "SQL")
+	if err != nil {
+		return "", fmt.Errorf("ERROR: failed to extract 'SQL' value from: %s, got error: %v", message, err)
+	}
+	// Extract bind variables
+	bindVars := map[string]*querypb.BindVariable{}
+	err = jsonparser.ObjectEach(json, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
+		bindVarType, err := jsonparser.GetString(value, "type")
+		if err != nil {
+			return fmt.Errorf("ERROR: failed to extract %s BindVar 'type' from: %s, got error: %v", string(key), message, err)
+		}
+		typeIndex, ok := querypb.Type_value[strings.ToUpper(bindVarType)]
+		if !ok {
+			return fmt.Errorf("ERROR: invalid %s BindVar 'type': %s, in: %s", string(key), bindVarType, message)
+		}
+		bvt := querypb.Type(typeIndex)
+		if bvt == querypb.Type_TUPLE {
+			bindVarValues := []*querypb.Value{}
+			_, err = jsonparser.ArrayEach(value, func(innnerValue []byte, _ jsonparser.ValueType, _ int, err error) {
+				if err != nil {
+					return
+				}
+				innerBindVarType, err := jsonparser.GetString(innnerValue, "type")
+				if err != nil {
+					return
+				}
+				innerBindVarValue, _, _, err := jsonparser.Get(innnerValue, "value")
+				if err != nil {
+					return
+				}
+				innerTypeIndex, ok := querypb.Type_value[strings.ToUpper(innerBindVarType)]
+				if !ok {
+					log.Errorf("invalid BindVar 'type': %s", innerBindVarType)
+					return
+				}
+				bindVarValues = append(
+					bindVarValues, &querypb.Value{
+						Type:  querypb.Type(innerTypeIndex),
+						Value: innerBindVarValue,
+					},
+				)
+			}, "values")
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to extract %s BindVar 'values' from: %s, got error: %v", string(key), message, err)
+			}
+			bindVars[string(key)] = &querypb.BindVariable{
+				Type:   bvt,
+				Values: bindVarValues,
+			}
+		} else {
+			bindVarValue, _, _, err := jsonparser.Get(value, "value")
+			if err != nil {
+				return fmt.Errorf("ERROR: failed to extract %s BindVar 'value' from: %s, got error: %v", string(key), message, err)
+			}
+			bindVars[string(key)] = &querypb.BindVariable{
+				Type:  bvt,
+				Value: bindVarValue,
+			}
+		}
+		return nil
+	}, "BindVars")
+	if err != nil {
+		return "", err
+	}
+
+	return formatSQLWithBind(sql, bindVars)
+}
+
+// RunFromJSON runs the explain analysis on the given json queries
+func RunFromJSON(input string) ([]*Explain, error) {
+	lines := strings.Split(input, "\n")
+	explains := make([]*Explain, 0, len(lines))
+	for _, line := range lines {
+		sql, err := parseJSONQuery(line)
+		if err != nil {
+			return nil, err
+		}
+		// Need to strip comments in a loop to handle multiple comments
+		// in a row.
+		for {
+			s := sqlparser.StripLeadingComments(sql)
+			if s == sql {
+				break
+			}
+			sql = s
+		}
+
+		if sql != "" {
+			// Reset the global time simulator unless there's an open transaction
+			// in the session from the previous staement.
+			if vtgateSession == nil || !vtgateSession.GetInTransaction() {
+				batchTime = sync2.NewBatcher(*batchInterval)
+			}
+			log.V(100).Infof("explain %s", sql)
+			e, err := explain(sql)
+			if err != nil {
+				return nil, err
+			}
+			explains = append(explains, e)
+		}
+
 	}
 
 	return explains, nil
