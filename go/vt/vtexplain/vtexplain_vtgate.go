@@ -30,6 +30,7 @@ import (
 	"vitess.io/vitess/go/vt/topo/memorytopo"
 
 	"vitess.io/vitess/go/vt/vterrors"
+	"vitess.io/vitess/go/vt/vtgate/vindexes"
 
 	"vitess.io/vitess/go/json2"
 	"vitess.io/vitess/go/streamlog"
@@ -107,6 +108,12 @@ func buildTopology(opts *Options, vschemaStr string, ksShardMapStr string, numSh
 	err := json2.Unmarshal([]byte(wrappedStr), &srvVSchema)
 	if err != nil {
 		return err
+	}
+	schema := vindexes.BuildVSchema(&srvVSchema)
+	for ks, ksSchema := range schema.Keyspaces {
+		if ksSchema.Error != nil {
+			return vterrors.Wrapf(ksSchema.Error, "vschema failed to load on keyspace [%s]", ks)
+		}
 	}
 	explainTopo.Keyspaces = srvVSchema.Keyspaces
 
