@@ -183,6 +183,7 @@ func TestErrors(t *testing.T) {
 }
 
 func TestJSONOutput(t *testing.T) {
+	initTest(ModeMulti, defaultTestOpts(), &testopts{}, t)
 	sql := "select 1 from user where id = 1"
 	explains, err := Run(sql)
 	require.NoError(t, err, "vtexplain error")
