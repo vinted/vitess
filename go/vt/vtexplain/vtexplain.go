@@ -301,18 +301,18 @@ func parseJSONQuery(message string) (string, error) {
 	// Extract SQL field
 	sql, err := jsonparser.GetString(json, "SQL")
 	if err != nil {
-		return "", fmt.Errorf("ERROR: failed to extract 'SQL' value from: %s, got error: %v", message, err)
+		return "", fmt.Errorf("ERROR: failed to extract 'SQL' value from: '%s', got error: %v", message, err)
 	}
 	// Extract bind variables
 	bindVars := map[string]*querypb.BindVariable{}
 	err = jsonparser.ObjectEach(json, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
 		bindVarType, err := jsonparser.GetString(value, "type")
 		if err != nil {
-			return fmt.Errorf("ERROR: failed to extract %s BindVar 'type' from: %s, got error: %v", string(key), message, err)
+			return fmt.Errorf("ERROR: failed to extract %s BindVar 'type' from: '%s', got error: %v", string(key), message, err)
 		}
 		typeIndex, ok := querypb.Type_value[strings.ToUpper(bindVarType)]
 		if !ok {
-			return fmt.Errorf("ERROR: invalid %s BindVar 'type': %s, in: %s", string(key), bindVarType, message)
+			return fmt.Errorf("ERROR: invalid %s BindVar 'type': %s, in: '%s'", string(key), bindVarType, message)
 		}
 		bvt := querypb.Type(typeIndex)
 		if bvt == querypb.Type_TUPLE {
@@ -342,7 +342,7 @@ func parseJSONQuery(message string) (string, error) {
 				)
 			}, "values")
 			if err != nil {
-				return fmt.Errorf("ERROR: failed to extract %s BindVar 'values' from: %s, got error: %v", string(key), message, err)
+				return fmt.Errorf("ERROR: failed to extract %s BindVar 'values' from: '%s', got error: %v", string(key), message, err)
 			}
 			bindVars[string(key)] = &querypb.BindVariable{
 				Type:   bvt,
@@ -351,7 +351,7 @@ func parseJSONQuery(message string) (string, error) {
 		} else {
 			bindVarValue, _, _, err := jsonparser.Get(value, "value")
 			if err != nil {
-				return fmt.Errorf("ERROR: failed to extract %s BindVar 'value' from: %s, got error: %v", string(key), message, err)
+				return fmt.Errorf("ERROR: failed to extract %s BindVar 'value' from: '%s', got error: %v", string(key), message, err)
 			}
 			bindVars[string(key)] = &querypb.BindVariable{
 				Type:  bvt,
@@ -371,10 +371,15 @@ func parseJSONQuery(message string) (string, error) {
 func RunFromJSON(input string) ([]*Explain, error) {
 	lines := strings.Split(input, "\n")
 	explains := make([]*Explain, 0, len(lines))
-	for _, line := range lines {
+	for lineNumber, line := range lines {
+		// Handle empty lines
+		if len(line) == 0 {
+			continue
+		}
 		sql, err := parseJSONQuery(line)
 		if err != nil {
-			return nil, err
+			log.Errorf("failed to parse line %v, got error: %s", lineNumber, err)
+			continue
 		}
 		// Need to strip comments in a loop to handle multiple comments
 		// in a row.
