@@ -478,7 +478,7 @@ func newTabletEnvironment(ddls []sqlparser.DDLStatement, opts *Options) (*tablet
 
 func (t *explainTablet) appendMySQLQuery(query string, ignoredQuery bool) {
 	if ignoredQuery {
-		log.V(100).Infof("Ignored query: %s\n", query)
+		log.V(10).Infof("Ignored query: %s\n", query)
 		return
 	}
 	t.mysqlQueries = append(t.mysqlQueries, &MysqlQuery{
@@ -579,7 +579,10 @@ func (t *explainTablet) HandleQuery(c *mysql.Conn, query string, callback func(*
 		for _, node := range selStmt.SelectExprs {
 			switch node := node.(type) {
 			case *sqlparser.AliasedExpr:
-				colNames, colTypes = inferColTypeFromExpr(node.Expr, tableColumnMap, colNames, colTypes)
+				colNames, colTypes, err = inferColTypeFromExpr(node.Expr, tableColumnMap, colNames, colTypes)
+				if err != nil {
+					log.Errorf("vtexplain: unable to infer column type from expression, got error: %s, in query: %s", err, query)
+				}
 			case *sqlparser.StarExpr:
 				if node.TableName.Name.IsEmpty() {
 					// SELECT *
@@ -718,7 +721,8 @@ func getTables(node sqlparser.SQLNode) []*sqlparser.AliasedTableExpr {
 	return tables
 }
 
-func inferColTypeFromExpr(node sqlparser.Expr, tableColumnMap map[sqlparser.TableIdent]map[string]querypb.Type, colNames []string, colTypes []querypb.Type) ([]string, []querypb.Type) {
+func inferColTypeFromExpr(node sqlparser.Expr, tableColumnMap map[sqlparser.TableIdent]map[string]querypb.Type, colNames []string, colTypes []querypb.Type) ([]string, []querypb.Type, error) {
+	var err error
 	switch node := node.(type) {
 	case *sqlparser.ColName:
 		if node.Qualifier.Name.IsEmpty() {
@@ -730,8 +734,8 @@ func inferColTypeFromExpr(node sqlparser.Expr, tableColumnMap map[sqlparser.Tabl
 			for _, colTypeMap := range tableColumnMap {
 				if colTypeMap[col] != querypb.Type_NULL_TYPE {
 					if colType != querypb.Type_NULL_TYPE {
-						log.Errorf("vtexplain: ambiguous column %s", col)
-						return colNames, colTypes
+						err = fmt.Errorf("ambiguous column %s", col)
+						return colNames, colTypes, err
 					}
 
 					colType = colTypeMap[col]
@@ -739,7 +743,7 @@ func inferColTypeFromExpr(node sqlparser.Expr, tableColumnMap map[sqlparser.Tabl
 			}
 
 			if colType == querypb.Type_NULL_TYPE {
-				log.Errorf("vtexplain: invalid column %s.%s, tableColumnMap +%v", node.Qualifier.Name, col, tableColumnMap)
+				err = fmt.Errorf("invalid column %s.%s, tableColumnMap +%v", node.Qualifier.Name, col, tableColumnMap)
 			}
 
 			colNames = append(colNames, col)
@@ -751,7 +755,7 @@ func inferColTypeFromExpr(node sqlparser.Expr, tableColumnMap map[sqlparser.Tabl
 			colType := colTypeMap[col]
 
 			if colType == querypb.Type_NULL_TYPE {
-				log.Errorf("vtexplain: invalid column %s.%s, tableColumnMap +%v", node.Qualifier.Name, col, tableColumnMap)
+				err = fmt.Errorf("invalid column %s.%s, tableColumnMap +%v", node.Qualifier.Name, col, tableColumnMap)
 			}
 
 			colNames = append(colNames, col)
@@ -777,10 +781,10 @@ func inferColTypeFromExpr(node sqlparser.Expr, tableColumnMap map[sqlparser.Tabl
 		case sqlparser.FloatVal:
 			colTypes = append(colTypes, querypb.Type_FLOAT64)
 		default:
-			log.Errorf("vtexplain: unsupported sql value %s", sqlparser.String(node))
+			err = fmt.Errorf("unsupported sql value %s", sqlparser.String(node))
 		}
 	case *sqlparser.CaseExpr:
-		colNames, colTypes = inferColTypeFromExpr(node.Whens[0].Val, tableColumnMap, colNames, colTypes)
+		colNames, colTypes, err = inferColTypeFromExpr(node.Whens[0].Val, tableColumnMap, colNames, colTypes)
 	case *sqlparser.NullVal:
 		colNames = append(colNames, sqlparser.String(node))
 		colTypes = append(colTypes, querypb.Type_NULL_TYPE)
@@ -788,8 +792,8 @@ func inferColTypeFromExpr(node sqlparser.Expr, tableColumnMap map[sqlparser.Tabl
 		colNames = append(colNames, sqlparser.String(node))
 		colTypes = append(colTypes, querypb.Type_INT64)
 	default:
-		log.Errorf("vtexplain: unsupported select expression type +%v node %s", reflect.TypeOf(node), sqlparser.String(node))
+		err = fmt.Errorf("unsupported select expression type +%v node %s", reflect.TypeOf(node), sqlparser.String(node))
 	}
 
-	return colNames, colTypes
+	return colNames, colTypes, err
 }
