@@ -476,17 +476,24 @@ func newTabletEnvironment(ddls []sqlparser.DDLStatement, opts *Options) (*tablet
 	return &tEnv, nil
 }
 
+func (t *explainTablet) appendMySQLQuery(query string, ignoredQuery bool) {
+	if ignoredQuery {
+		log.V(100).Infof("Ignored query: %s\n", query)
+		return
+	}
+	t.mysqlQueries = append(t.mysqlQueries, &MysqlQuery{
+		Time: t.currentTime,
+		SQL:  query,
+	})
+}
+
 // HandleQuery implements the fakesqldb query handler interface
 func (t *explainTablet) HandleQuery(c *mysql.Conn, query string, callback func(*sqltypes.Result) error) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if !strings.Contains(query, "1 != 1") {
-		t.mysqlQueries = append(t.mysqlQueries, &MysqlQuery{
-			Time: t.currentTime,
-			SQL:  query,
-		})
-	}
+	// check if we should add this query to mysqlQueries for explain
+	ignoredQuery := strings.Contains(query, "1 != 1")
 
 	// return the pre-computed results for any schema introspection queries
 	result, ok := getGlobalTabletEnv().schemaQueries[query]
@@ -501,6 +508,7 @@ func (t *explainTablet) HandleQuery(c *mysql.Conn, query string, callback func(*
 		// expected field names and types.
 		stmt, err := sqlparser.Parse(query)
 		if err != nil {
+			t.appendMySQLQuery(query, ignoredQuery)
 			return err
 		}
 
@@ -511,10 +519,11 @@ func (t *explainTablet) HandleQuery(c *mysql.Conn, query string, callback func(*
 		case *sqlparser.Union:
 			selStmt = stmt.FirstStatement.(*sqlparser.Select)
 		default:
-			return fmt.Errorf("vtexplain: unsupported statement type +%v", reflect.TypeOf(stmt))
+			t.appendMySQLQuery(query, ignoredQuery)
+			return fmt.Errorf("vtexplain: unsupported statement type: +%v, in query: %s", reflect.TypeOf(stmt), query)
 		}
 
-		if len(selStmt.From) == 1 && isMetadataSelect(selStmt.From[0]) {
+		if len(selStmt.From) == 1 && isMetadataQuery(selStmt.From[0]) {
 			return callback(
 				&sqltypes.Result{
 					Fields: []*querypb.Field{{Type: sqltypes.Uint64}},
@@ -540,6 +549,7 @@ func (t *explainTablet) HandleQuery(c *mysql.Conn, query string, callback func(*
 			tableName := sqlparser.String(sqlparser.GetTableName(table.Expr))
 			columns, exists := getGlobalTabletEnv().tableColumns[tableName]
 			if !exists && tableName != "" && tableName != "dual" {
+				t.appendMySQLQuery(query, ignoredQuery)
 				return fmt.Errorf("unable to resolve table name %s", tableName)
 			}
 
@@ -554,6 +564,7 @@ func (t *explainTablet) HandleQuery(c *mysql.Conn, query string, callback func(*
 			for k, v := range columns {
 				if colType, exists := colTypeMap[k]; exists {
 					if colType != v {
+						t.appendMySQLQuery(query, ignoredQuery)
 						return fmt.Errorf("column type mismatch for column : %s, types: %d vs %d", k, colType, v)
 					}
 					continue
@@ -657,18 +668,35 @@ func (t *explainTablet) HandleQuery(c *mysql.Conn, query string, callback func(*
 	case sqlparser.StmtBegin, sqlparser.StmtCommit, sqlparser.StmtSet, sqlparser.StmtShow:
 		result = &sqltypes.Result{}
 	case sqlparser.StmtInsert, sqlparser.StmtReplace, sqlparser.StmtUpdate, sqlparser.StmtDelete:
+		// Parse the Insert, Replace, Update, Delete statements to figure out the table qualifier
+		stmt, err := sqlparser.Parse(query)
+		if err != nil {
+			t.appendMySQLQuery(query, ignoredQuery)
+			return err
+		}
+		switch dmlStmt := stmt.(type) {
+		case *sqlparser.Insert:
+			// Insert, Replice
+			ignoredQuery = isMetadataQuery(dmlStmt.Table)
+		case *sqlparser.Update:
+			ignoredQuery = len(dmlStmt.TableExprs) == 1 && isMetadataQuery(dmlStmt.TableExprs[0])
+		case *sqlparser.Delete:
+			ignoredQuery = len(dmlStmt.TableExprs) == 1 && isMetadataQuery(dmlStmt.TableExprs[0])
+		}
 		result = &sqltypes.Result{
 			RowsAffected: 1,
 		}
 	default:
+		t.appendMySQLQuery(query, ignoredQuery)
 		return fmt.Errorf("unsupported query %s", query)
 	}
 
+	t.appendMySQLQuery(query, ignoredQuery)
 	return callback(result)
 }
 
 // Check if query is selecting from metadata databases
-func isMetadataSelect(node sqlparser.SQLNode) bool {
+func isMetadataQuery(node sqlparser.SQLNode) bool {
 	switch expr := node.(type) {
 	case *sqlparser.AliasedTableExpr:
 		if n, ok := expr.Expr.(sqlparser.TableName); ok && n.Qualifier.String() == "_vt" {
