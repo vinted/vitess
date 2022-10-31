@@ -197,15 +197,9 @@ func parseAndRun() error {
 	var plans []*vtexplain.Explain
 	switch *inputMode {
 	case "text":
-		plans, err = vtexplain.Run(sql)
-		if err != nil {
-			return err
-		}
+		plans = vtexplain.Run(sql)
 	case "json":
-		plans, err = vtexplain.RunFromJSON(sql)
-		if err != nil {
-			return err
-		}
+		plans = vtexplain.RunFromJSON(sql)
 	default:
 		return fmt.Errorf("invalid input-mode: %s", *inputMode)
 	}

@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"vitess.io/vitess/go/vt/vttablet/tabletserver/schema"
 
 	topodatapb "vitess.io/vitess/go/vt/proto/topodata"
@@ -74,10 +76,11 @@ create table t2 (
 
 	sql := "SELECT * FROM t1 INNER JOIN t2 ON t1.id = t2.id"
 
-	_, err = Run(sql)
+	explains := Run(sql)
 	if err != nil {
 		t.Error(err)
 	}
+	require.Empty(t, explains[0].Error)
 }
 
 func TestParseSchema(t *testing.T) {

@@ -146,6 +146,9 @@ type Explain struct {
 
 	// list of queries / bind vars sent to each tablet
 	TabletActions map[string]*TabletActions
+
+	// vtexplain error
+	Error string
 }
 
 // Init sets up the fake execution environment
@@ -235,7 +238,7 @@ func parseSchema(sqlSchema string, opts *Options) ([]sqlparser.DDLStatement, err
 }
 
 // Run the explain analysis on the given queries
-func Run(sql string) ([]*Explain, error) {
+func Run(sql string) []*Explain {
 	explains := make([]*Explain, 0, 16)
 
 	var (
@@ -256,7 +259,8 @@ func Run(sql string) ([]*Explain, error) {
 
 		sql, rem, err = sqlparser.SplitStatement(sql)
 		if err != nil {
-			return nil, err
+			log.Errorf("failed to parse %s, got error: %s", sql, err)
+			continue
 		}
 
 		if sql != "" {
@@ -266,11 +270,7 @@ func Run(sql string) ([]*Explain, error) {
 				batchTime = sync2.NewBatcher(*batchInterval)
 			}
 			log.V(100).Infof("explain %s", sql)
-			e, err := explain(sql)
-			if err != nil {
-				return nil, err
-			}
-			explains = append(explains, e)
+			explains = append(explains, explain(sql))
 		}
 
 		sql = rem
@@ -279,7 +279,7 @@ func Run(sql string) ([]*Explain, error) {
 		}
 	}
 
-	return explains, nil
+	return explains
 }
 
 // Replaces SQL bind variable tokens with values
@@ -371,7 +371,7 @@ func parseJSONQuery(message string) (string, error) {
 }
 
 // RunFromJSON runs the explain analysis on the given json queries
-func RunFromJSON(input string) ([]*Explain, error) {
+func RunFromJSON(input string) []*Explain {
 	lines := strings.Split(input, "\n")
 	explains := make([]*Explain, 0, len(lines))
 	for lineNumber, line := range lines {
@@ -401,29 +401,27 @@ func RunFromJSON(input string) ([]*Explain, error) {
 				batchTime = sync2.NewBatcher(*batchInterval)
 			}
 			log.V(100).Infof("explain %s", sql)
-			e, err := explain(sql)
-			if err != nil {
-				return nil, err
-			}
-			explains = append(explains, e)
+			explains = append(explains, explain(sql))
 		}
 
 	}
 
-	return explains, nil
+	return explains
 }
 
-func explain(sql string) (*Explain, error) {
+func explain(sql string) *Explain {
 	plans, tabletActions, err := vtgateExecute(sql)
+	explainError := ""
 	if err != nil {
-		return nil, err
+		explainError = err.Error()
 	}
 
 	return &Explain{
 		SQL:           sql,
 		Plans:         plans,
 		TabletActions: tabletActions,
-	}, nil
+		Error:         explainError,
+	}
 }
 
 type outputQuery struct {
@@ -440,28 +438,32 @@ func ExplainsAsText(explains []*Explain) string {
 		fmt.Fprintf(&b, "----------------------------------------------------------------------\n")
 		fmt.Fprintf(&b, "%s\n\n", explain.SQL)
 
-		queries := make([]outputQuery, 0, 4)
-		for tablet, actions := range explain.TabletActions {
-			for _, q := range actions.MysqlQueries {
-				queries = append(queries, outputQuery{
-					tablet: tablet,
-					Time:   q.Time,
-					sql:    q.SQL,
-				})
+		if len(explain.Error) > 0 {
+			fmt.Fprintf(&b, "ERROR: %s", explain.Error)
+		} else {
+			queries := make([]outputQuery, 0, 4)
+			for tablet, actions := range explain.TabletActions {
+				for _, q := range actions.MysqlQueries {
+					queries = append(queries, outputQuery{
+						tablet: tablet,
+						Time:   q.Time,
+						sql:    q.SQL,
+					})
+				}
 			}
-		}
 
-		// Make sure to sort first by the batch time and then by the
-		// shard to avoid flakiness in the tests for parallel queries
-		sort.SliceStable(queries, func(i, j int) bool {
-			if queries[i].Time == queries[j].Time {
-				return queries[i].tablet < queries[j].tablet
+			// Make sure to sort first by the batch time and then by the
+			// shard to avoid flakiness in the tests for parallel queries
+			sort.SliceStable(queries, func(i, j int) bool {
+				if queries[i].Time == queries[j].Time {
+					return queries[i].tablet < queries[j].tablet
+				}
+				return queries[i].Time < queries[j].Time
+			})
+
+			for _, q := range queries {
+				fmt.Fprintf(&b, "%d %s: %s\n", q.Time, q.tablet, q.sql)
 			}
-			return queries[i].Time < queries[j].Time
-		})
-
-		for _, q := range queries {
-			fmt.Fprintf(&b, "%d %s: %s\n", q.Time, q.tablet, q.sql)
 		}
 		fmt.Fprintf(&b, "\n")
 	}
