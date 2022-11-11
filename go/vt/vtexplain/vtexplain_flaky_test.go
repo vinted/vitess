@@ -47,7 +47,7 @@ type testopts struct {
 	shardmap map[string]map[string]*topo.ShardInfo
 }
 
-func initTest(mode string, opts *Options, topts *testopts, t *testing.T) {
+func initTest(mode string, opts *Options, topts *testopts, t *testing.T) *VTExplain {
 	schema, err := ioutil.ReadFile("testdata/test-schema.sql")
 	require.NoError(t, err)
 
@@ -63,8 +63,9 @@ func initTest(mode string, opts *Options, topts *testopts, t *testing.T) {
 	}
 
 	opts.ExecutionMode = mode
-	err = Init(string(vSchema), string(schema), shardmap, opts)
+	vte, err := Init(string(vSchema), string(schema), shardmap, opts)
 	require.NoError(t, err, "vtexplain Init error\n%s", string(schema))
+	return vte
 }
 
 func testExplain(testcase string, opts *Options, t *testing.T) {
@@ -83,7 +84,7 @@ func testExplain(testcase string, opts *Options, t *testing.T) {
 
 func runTestCase(testcase, mode string, opts *Options, topts *testopts, t *testing.T) {
 	t.Run(testcase, func(t *testing.T) {
-		initTest(mode, opts, topts, t)
+		vte := initTest(mode, opts, topts, t)
 
 		sqlFile := fmt.Sprintf("testdata/%s-queries.sql", testcase)
 		sql, err := ioutil.ReadFile(sqlFile)
@@ -92,13 +93,13 @@ func runTestCase(testcase, mode string, opts *Options, topts *testopts, t *testi
 		textOutFile := fmt.Sprintf("testdata/%s-output/%s-output.txt", mode, testcase)
 		expected, _ := ioutil.ReadFile(textOutFile)
 
-		explains := Run(string(sql))
+		explains := vte.Run(string(sql))
 		require.NotEmpty(t, explains, "vtexplain error running %s: no explain", string(sql))
 		for _, explain := range explains {
 			require.Empty(t, explain.Error, "vtexplain error running %s", explain.SQL)
 		}
 
-		explainText := ExplainsAsText(explains)
+		explainText := vte.ExplainsAsText(explains)
 		if diff := cmp.Diff(strings.TrimSpace(string(expected)), strings.TrimSpace(explainText)); diff != "" {
 			// Print the Text that was actually returned and also dump to a
 			// temp file to be able to diff the results.
@@ -148,7 +149,7 @@ func TestExplain(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
-	initTest(ModeMulti, defaultTestOpts(), &testopts{}, t)
+	vte := initTest(ModeMulti, defaultTestOpts(), &testopts{}, t)
 
 	tests := []struct {
 		SQL string
@@ -177,7 +178,7 @@ func TestErrors(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.SQL, func(t *testing.T) {
-			explains := Run(test.SQL)
+			explains := vte.Run(test.SQL)
 			require.Len(t, explains, 1)
 			require.Contains(t, explains[0].Error, test.Err)
 		})
@@ -185,13 +186,13 @@ func TestErrors(t *testing.T) {
 }
 
 func TestJSONOutput(t *testing.T) {
-	initTest(ModeMulti, defaultTestOpts(), &testopts{}, t)
+	vte := initTest(ModeMulti, defaultTestOpts(), &testopts{}, t)
 	sql := "select 1 from user where id = 1"
-	explains := Run(sql)
+	explains := vte.Run(sql)
 	require.Len(t, explains, 1)
 	require.Empty(t, explains[0].Error, "vtexplain error running %s: no explain", string(sql))
 
-	explainJSON := ExplainsAsJSON(explains)
+	explainJSON := vte.ExplainsAsJSON(explains)
 
 	var data interface{}
 	err := json.Unmarshal([]byte(explainJSON), &data)
@@ -250,7 +251,7 @@ func TestJSONOutput(t *testing.T) {
 }
 
 func TestJSONInput(t *testing.T) {
-	initTest(ModeMulti, defaultTestOpts(), &testopts{}, t)
+	vte := initTest(ModeMulti, defaultTestOpts(), &testopts{}, t)
 
 	testJSONInputcases := []struct {
 		message     string
@@ -311,7 +312,7 @@ func TestJSONInput(t *testing.T) {
 
 	for _, tcase := range testJSONInputcases {
 		singleLineMessage := strings.ReplaceAll(tcase.message, "\n", "")
-		explains := RunFromJSON(singleLineMessage)
+		explains := vte.RunFromJSON(singleLineMessage)
 		require.Len(t, explains, 1)
 		require.Empty(t, explains[0].Error)
 		require.Equal(t, tcase.wantExplain.SQL, explains[0].SQL)
@@ -381,7 +382,7 @@ func TestInit(t *testing.T) {
   }
 }`
 	schema := "create table table_missing_primary_vindex (id int primary key)"
-	err := Init(vschema, schema, "", defaultTestOpts())
+	_, err := Init(vschema, schema, "", defaultTestOpts())
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "missing primary col vindex")

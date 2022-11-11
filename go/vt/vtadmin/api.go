@@ -1085,18 +1085,16 @@ func (api *API) VTExplain(ctx context.Context, req *vtadminpb.VTExplainRequest) 
 
 	span.Annotate("vtexplain_lock_wait_time", lockWaitTime.String())
 
-	if err := vtexplain.Init(srvVSchema, schema, shardMap, opts); err != nil {
+	vte, err := vtexplain.Init(srvVSchema, schema, shardMap, opts)
+	if err != nil {
 		return nil, fmt.Errorf("error initilaizing vtexplain: %w", err)
 	}
 
-	defer vtexplain.Stop()
+	defer vte.Stop()
 
-	plans, err := vtexplain.Run(req.Sql)
-	if err != nil {
-		return nil, fmt.Errorf("error running vtexplain: %w", err)
-	}
+	plans := vte.Run(req.Sql)
 
-	response := vtexplain.ExplainsAsText(plans)
+	response := vte.ExplainsAsText(plans)
 	return &vtadminpb.VTExplainResponse{
 		Response: response,
 	}, nil

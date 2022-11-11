@@ -137,7 +137,6 @@ func getFileParam(flag, flagFile, name string, required bool) (string, error) {
 }
 
 func main() {
-	defer vtexplain.Stop()
 	defer exit.RecoverAll()
 	defer logutil.Flush()
 
@@ -189,25 +188,26 @@ func parseAndRun() error {
 	log.V(100).Infof("schema %s\n", schema)
 	log.V(100).Infof("vschema %s\n", vschema)
 
-	err = vtexplain.Init(vschema, schema, ksShardMap, opts)
+	vte, err := vtexplain.Init(vschema, schema, ksShardMap, opts)
 	if err != nil {
 		return err
 	}
+	defer vte.Stop()
 
 	var plans []*vtexplain.Explain
 	switch *inputMode {
 	case "text":
-		plans = vtexplain.Run(sql)
+		plans = vte.Run(sql)
 	case "json":
-		plans = vtexplain.RunFromJSON(sql)
+		plans = vte.RunFromJSON(sql)
 	default:
 		return fmt.Errorf("invalid input-mode: %s", *inputMode)
 	}
 
 	if *outputMode == "text" {
-		fmt.Print(vtexplain.ExplainsAsText(plans))
+		fmt.Print(vte.ExplainsAsText(plans))
 	} else {
-		fmt.Print(vtexplain.ExplainsAsJSON(plans))
+		fmt.Print(vte.ExplainsAsJSON(plans))
 	}
 
 	return nil
