@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"flag"
 	"os"
 	"testing"
@@ -37,6 +38,7 @@ var (
 	hostname        = "localhost"
 	keyspaceName    = "ks"
 	cell            = "zone1"
+	fastDropTable   bool
 	sqlSchema       = `
 	create table if not exists t1(
 		id bigint not null auto_increment,
@@ -64,6 +66,8 @@ var (
       }
     }
 	}`
+	gcPurgeCheckInterval     = 2 * time.Second
+	waitForTransitionTimeout = 30 * time.Second
 )
 
 func TestMain(m *testing.M) {
@@ -152,19 +156,101 @@ func tableExists(tableExpr string) (exists bool, tableName string, err error) {
 	if err != nil {
 		return false, "", err
 	}
-	row := rs.Named().Row()
-	if row == nil {
-		return false, "", nil
+	for _, row := range rs.Named().Rows {
+		return true, row.AsString("table_name", ""), nil
 	}
-	return true, row.AsString("Name", ""), nil
+	return false, "", nil
 }
 
-// tableExists sees that a given table exists in MySQL
-func dropTable(tableName string) (err error) {
+func validateTableDoesNotExist(t *testing.T, tableExpr string) {
+	ctx, cancel := context.WithTimeout(context.Background(), waitForTransitionTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(time.Second)
+	var foundTableName string
+	var exists bool
+	var err error
+	for {
+		select {
+		case <-ticker.C:
+			exists, foundTableName, err = tableExists(tableExpr)
+			require.NoError(t, err)
+			if !exists {
+				return
+			}
+		case <-ctx.Done():
+			assert.NoError(t, ctx.Err(), "validateTableDoesNotExist timed out, table %v still exists (%v)", tableExpr, foundTableName)
+			return
+		}
+	}
+}
+
+func validateTableExists(t *testing.T, tableExpr string) {
+	ctx, cancel := context.WithTimeout(context.Background(), waitForTransitionTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(time.Second)
+	var exists bool
+	var err error
+	for {
+		select {
+		case <-ticker.C:
+			exists, _, err = tableExists(tableExpr)
+			require.NoError(t, err)
+			if exists {
+				return
+			}
+		case <-ctx.Done():
+			assert.NoError(t, ctx.Err(), "validateTableExists timed out, table %v still does not exist", tableExpr)
+			return
+		}
+	}
+}
+
+func validateAnyState(t *testing.T, expectNumRows int64, states ...schema.TableGCState) {
+	for _, state := range states {
+		expectTableToExist := true
+		searchExpr := ""
+		switch state {
+		case schema.HoldTableGCState:
+			searchExpr = `\_vt\_HOLD\_%`
+		case schema.PurgeTableGCState:
+			searchExpr = `\_vt\_PURGE\_%`
+		case schema.EvacTableGCState:
+			searchExpr = `\_vt\_EVAC\_%`
+		case schema.DropTableGCState:
+			searchExpr = `\_vt\_DROP\_%`
+		case schema.TableDroppedGCState:
+			searchExpr = `\_vt\_%`
+			expectTableToExist = false
+		default:
+			t.Log("Unknown state")
+			t.Fail()
+		}
+		exists, tableName, err := tableExists(searchExpr)
+		require.NoError(t, err)
+
+		if exists {
+			if expectNumRows >= 0 {
+				checkTableRows(t, tableName, expectNumRows)
+			}
+			// Now that the table is validated, we can drop it
+			dropTable(t, tableName)
+		}
+		if exists == expectTableToExist {
+			// condition met
+			return
+		}
+	}
+	assert.Failf(t, "could not match any of the states", "states=%v", states)
+}
+
+// dropTable drops a table
+func dropTable(t *testing.T, tableName string) {
 	query := `drop table if exists %a`
 	parsed := sqlparser.BuildParsedQuery(query, tableName)
-	_, err = masterTablet.VttabletProcess.QueryTablet(parsed.Query, keyspaceName, true)
-	return err
+	_, err := masterTablet.VttabletProcess.QueryTablet(parsed.Query, keyspaceName, true)
+	require.NoError(t, err)
 }
 
 func TestPopulateTable(t *testing.T) {
@@ -222,8 +308,7 @@ func TestHold(t *testing.T) {
 		exists, purgeTableName, err := tableExists(`\_vt\_PURGE\_%`)
 		assert.NoError(t, err)
 		assert.True(t, exists)
-		err = dropTable(purgeTableName)
-		assert.NoError(t, err)
+		dropTable(t, purgeTableName)
 	}
 }
 
@@ -303,41 +388,19 @@ func TestPurge(t *testing.T) {
 	_, err = masterTablet.VttabletProcess.QueryTablet(query, keyspaceName, true)
 	require.NoError(t, err)
 
-	{
-		exists, _, err := tableExists("t1")
-		require.NoError(t, err)
-		require.False(t, exists)
-	}
-	{
-		exists, _, err := tableExists(tableName)
-		require.NoError(t, err)
-		require.True(t, exists)
-	}
-
-	time.Sleep(5 * time.Second)
-	{
-		// Table was created with +10s timestamp, so it should still exist
-		exists, _, err := tableExists(tableName)
-		require.NoError(t, err)
-		require.True(t, exists)
-
+	validateTableDoesNotExist(t, "t1")
+	if !fastDropTable {
+		validateTableExists(t, tableName)
 		checkTableRows(t, tableName, 1024)
 	}
-
-	time.Sleep(15 * time.Second) // purgeReentranceInterval
-	{
-		// We're now both beyond table's timestamp as well as a tableGC interval
-		exists, _, err := tableExists(tableName)
-		require.NoError(t, err)
-		require.False(t, exists)
+	if !fastDropTable {
+		time.Sleep(5 * gcPurgeCheckInterval) // wait for table to be purged
 	}
-	{
-		// Table should be renamed as _vt_EVAC_...
-		exists, evacTableName, err := tableExists(`\_vt\_EVAC\_%`)
-		require.NoError(t, err)
-		require.True(t, exists)
-		checkTableRows(t, evacTableName, 0)
-		err = dropTable(evacTableName)
-		require.NoError(t, err)
+	validateTableDoesNotExist(t, tableName) // whether purged or not, table should at some point transition to next state
+	if fastDropTable {
+		// if MySQL supports fast DROP TABLE, TableGC completely skips the PURGE state. Rows are not purged.
+		validateAnyState(t, 1024, schema.DropTableGCState, schema.TableDroppedGCState)
+	} else {
+		validateAnyState(t, 0, schema.EvacTableGCState, schema.DropTableGCState, schema.TableDroppedGCState)
 	}
 }

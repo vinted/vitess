@@ -245,6 +245,7 @@ func (collector *TableGC) Operate(ctx context.Context) {
 			}
 		case <-tableCheckTicker.C:
 			{
+				log.Info("TableGC: tableCheckTicker")
 				_ = collector.checkTables(ctx)
 			}
 		case <-purgeReentranceTicker.C:
@@ -254,6 +255,7 @@ func (collector *TableGC) Operate(ctx context.Context) {
 			}
 		case <-collector.purgeRequestsChan:
 			{
+				log.Info("TableGC: purgeRequestsChan")
 				go func() {
 					if tableName, err := collector.purge(ctx); err != nil {
 						log.Errorf("TableGC: error purging table %s: %+v", tableName, err)
@@ -262,12 +264,14 @@ func (collector *TableGC) Operate(ctx context.Context) {
 			}
 		case dropTableName := <-collector.dropTablesChan:
 			{
+				log.Infof("TableGC: dropTablesChan, dropTableName=%s", dropTableName)
 				if err := collector.dropTable(ctx, dropTableName); err != nil {
 					log.Errorf("TableGC: error dropping table %s: %+v", dropTableName, err)
 				}
 			}
 		case transition := <-collector.transitionRequestsChan:
 			{
+				log.Info("TableGC: transitionRequestsChan, transition=%v", transition)
 				if err := collector.transitionTable(ctx, transition); err != nil {
 					log.Errorf("TableGC: error transitioning table %s to %+v: %+v", transition.fromTableName, transition.toGCState, err)
 				}
@@ -386,9 +390,12 @@ func (collector *TableGC) checkTables(ctx context.Context) error {
 			// Hold period expired. Moving to next state
 			collector.submitTransitionRequest(ctx, state, tableName, uuid)
 		}
+		collector.addPurgingTable(tableName)
 		if state == schema.PurgeTableGCState {
 			// This table needs to be purged. Make sure to enlist it (we may already have)
-			collector.addPurgingTable(tableName)
+			if !collector.addPurgingTable(tableName) {
+				collector.submitTransitionRequest(ctx, state, tableName, uuid)
+			}
 		}
 		if state == schema.EvacTableGCState {
 			// This table was in EVAC state for the required period. It will transition into DROP state
@@ -559,11 +566,18 @@ func (collector *TableGC) transitionTable(ctx context.Context, transition *trans
 }
 
 // addPurgingTable adds a table to the list of droppingpurging (or pending purging) tables
-func (collector *TableGC) addPurgingTable(tableName string) {
+func (collector *TableGC) addPurgingTable(tableName string) (added bool) {
+	if _, ok := collector.lifecycleStates[schema.PurgeTableGCState]; !ok {
+		// PURGE is not a handled state. We don't want to purge this table or any other table,
+		// so we don't populate the purgingTables map.
+		return false
+	}
+
 	collector.purgeMutex.Lock()
 	defer collector.purgeMutex.Unlock()
 
 	collector.purgingTables[tableName] = true
+	return true
 }
 
 // removePurgingTable removes a table from the purging list; likely this is called when
