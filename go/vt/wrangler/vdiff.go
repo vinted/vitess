@@ -228,6 +228,7 @@ func (wr *Wrangler) VDiff(ctx context.Context, targetKeyspace, workflowName, sou
 		return nil, vterrors.Wrap(err, "selectTablets")
 	}
 	defer func(ctx context.Context) {
+		log.Infof("VDIFF: [VDiff] defer with context to restartTargets for workflow: %s", workflowName)
 		if err := df.restartTargets(ctx); err != nil {
 			wr.Logger().Errorf("Could not restart workflow %s: %v, please restart it manually", workflowName, err)
 		}
@@ -307,6 +308,7 @@ func (df *vdiff) diffTable(ctx context.Context, wr *Wrangler, table string, td *
 
 	var err error
 	defer func() {
+		log.Infof("VDIFF:[diffTable] 7) deferred unlock for keyspace: %s", df.targetKeyspace)
 		unlock(&err)
 		if err != nil {
 			log.Errorf("UnlockKeyspace %s failed: %v", df.targetKeyspace, lockErr)
@@ -315,27 +317,33 @@ func (df *vdiff) diffTable(ctx context.Context, wr *Wrangler, table string, td *
 
 	defer func() {
 		log.Errorf("restarting targets for workflow %s in keyspace %s", df.workflow, df.targetKeyspace)
+		log.Errorf("VDIFF:[diffTable] 6) restarting targets for workflow %s in keyspace %s", df.workflow, df.targetKeyspace)
 		if err := df.restartTargets(ctx); err != nil {
 			log.Errorf("Error restarting targets for workflow %s in keyspace %s", df.workflow, df.targetKeyspace)
 		}
 	}()
 	// Stop the targets and record their source positions.
+	log.Info("VDIFF:[diffTable] 1) Stop the targets and record their source positions.")
 	if err := df.stopTargets(ctx); err != nil {
 		return vterrors.Wrap(err, "stopTargets")
 	}
 	// Make sure all sources are past the target's positions and start a query stream that records the current source positions.
+	log.Info("VDIFF:[diffTable] 2) Stop the targets and record their source positions.")
 	if err := df.startQueryStreams(ctx, df.ts.sourceKeyspace, df.sources, td.sourceExpression, filteredReplicationWaitTime); err != nil {
 		return vterrors.Wrap(err, "startQueryStreams(sources)")
 	}
 	// Fast forward the targets to the newly recorded source positions.
+	log.Info("VDIFF:[diffTable] 3) Fast forward the targets to the newly recorded source positions.")
 	if err := df.syncTargets(ctx, filteredReplicationWaitTime); err != nil {
 		return vterrors.Wrap(err, "syncTargets")
 	}
 	// Sources and targets are in sync. Start query streams on the targets.
+	log.Info("VDIFF:[diffTable] 4) Sources and targets are in sync. Start query streams on the targets.")
 	if err := df.startQueryStreams(ctx, df.ts.targetKeyspace, df.targets, td.targetExpression, filteredReplicationWaitTime); err != nil {
 		return vterrors.Wrap(err, "startQueryStreams(targets)")
 	}
 	// Now that queries are running, target vreplication streams can be restarted.
+	log.Info("VDIFF:[diffTable] 5) Now that queries are running, target vreplication streams can be restarted.")
 	return nil
 }
 
@@ -784,6 +792,7 @@ func (df *vdiff) restartTargets(ctx context.Context) error {
 	return df.forAll(df.targets, func(shard string, target *shardStreamer) error {
 		query := fmt.Sprintf("update _vt.vreplication set state='Running', message='', stop_pos='' where db_name=%s and workflow=%s", encodeString(target.master.DbName()), encodeString(df.ts.workflow))
 		log.Infof("restarting target replication with %s", query)
+		log.Infof("VDIFF: [restartTargets] ( shard: %s tablet: %s hostname: %s) restarting target replication with %s ", target.master.GetShard(), target.master.GetAlias(), target.master.GetHostname(), query)
 		_, err := df.ts.wr.tmc.VReplicationExec(ctx, target.master.Tablet, query)
 		return err
 	})
@@ -909,12 +918,17 @@ func (td *tableDiffer) diff(ctx context.Context, wr *Wrangler, rowsToCompare *in
 	targetExecutor := newPrimitiveExecutor(ctx, td.targetPrimitive)
 	dr := &DiffReport{}
 	var sourceRow, targetRow []sqltypes.Value
+	var sourceRowPrevious, targetRowPrevious *RowDiff
 	var err error
 	advanceSource := true
 	advanceTarget := true
 	for {
-		if dr.ProcessedRows%1e7 == 0 { // log progress every 10 million rows
+		if dr.ProcessedRows%1e5 == 0 { // log progress every 100000  rows
 			log.Infof("VDiff progress:: table %s: %s rows", td.targetTable, humanInt(int64(dr.ProcessedRows)))
+			if sourceRowPrevious != nil && targetRowPrevious != nil {
+				log.Infof("VDIFF:[diff] previous source row: %s", formatRowDiff(sourceRowPrevious))
+				log.Infof("VDIFF:[diff] previous target row: %s", formatRowDiff(targetRowPrevious))
+			}
 		}
 		*rowsToCompare--
 		if *rowsToCompare < 0 {
@@ -924,12 +938,22 @@ func (td *tableDiffer) diff(ctx context.Context, wr *Wrangler, rowsToCompare *in
 		if advanceSource {
 			sourceRow, err = sourceExecutor.next()
 			if err != nil {
+				if sourceRowPrevious != nil {
+					log.Errorf("VDIFF:[diff:advanceSource] failed, previous row: %s", formatRowDiff(sourceRowPrevious))
+				} else {
+					log.Error("VDIFF:[diff:advanceSource] failed, previous row: nil")
+				}
 				return nil, err
 			}
 		}
 		if advanceTarget {
 			targetRow, err = targetExecutor.next()
 			if err != nil {
+				if targetRowPrevious != nil {
+					log.Errorf("VDIFF:[diff:advanceTarget] failed, previous row: %s", formatRowDiff(targetRowPrevious))
+				} else {
+					log.Error("VDIFF:[diff:advanceTarget] failed, previous row: nil")
+				}
 				return nil, err
 			}
 		}
@@ -977,6 +1001,14 @@ func (td *tableDiffer) diff(ctx context.Context, wr *Wrangler, rowsToCompare *in
 
 		dr.ProcessedRows++
 
+		sourceRowPrevious, err = td.genRowDiff(td.sourceExpression, sourceRow, debug, onlyPks)
+		if err != nil {
+			return nil, vterrors.Wrap(err, "VDIFF:[diff] unexpected error generating diffRowSourcePrevious")
+		}
+		targetRowPrevious, err = td.genRowDiff(td.targetExpression, targetRow, debug, onlyPks)
+		if err != nil {
+			return nil, vterrors.Wrap(err, "VDIFF:[diff] unexpected error generating diffRowTargetPrevious")
+		}
 		// Compare pk values.
 		c, err := td.compare(sourceRow, targetRow, td.comparePKs, false)
 		switch {
@@ -1188,6 +1220,22 @@ func wrapWeightString(expr sqlparser.SelectExpr) *sqlparser.AliasedExpr {
 			},
 		},
 	}
+}
+
+func formatRowDiff(rd *RowDiff) string {
+	var result bytes.Buffer
+	keys := make([]string, 0, len(rd.Row))
+	for k := range rd.Row {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		result.WriteString(fmt.Sprintf("\t\t\t %s: %s\n", k, formatValue(rd.Row[k])))
+	}
+	result.WriteString(fmt.Sprintf("\t\tDebugQuery: %v\n", rd.Query))
+	return result.String()
 }
 
 func formatSampleRow(logger logutil.Logger, rd *RowDiff, debug bool) {

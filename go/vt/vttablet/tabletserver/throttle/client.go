@@ -18,6 +18,7 @@ package throttle
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -114,6 +115,7 @@ func (c *Client) ThrottleCheckOK(ctx context.Context) (throttleCheckOK bool) {
 func (c *Client) ThrottleCheckOKOrWait(ctx context.Context) bool {
 	ok := c.ThrottleCheckOK(ctx)
 	if !ok {
+		fmt.Printf("VDIFF:[ThrottleCheckOKOrWait] throttled keyspace: %s shard: %s \n", c.throttler.keyspace, c.throttler.shard)
 		time.Sleep(throttleCheckDuration)
 	}
 	return ok
