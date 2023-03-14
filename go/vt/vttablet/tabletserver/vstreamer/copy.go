@@ -263,7 +263,7 @@ func (uvs *uvstreamer) copyTable(ctx context.Context, tableName string) error {
 		}
 
 		newLastPK = sqltypes.CustomProto3ToResult(uvs.pkfields, &querypb.QueryResult{
-			Fields: rows.Fields,
+			Fields: uvs.pkfields,
 			Rows:   []*querypb.Row{rows.Lastpk},
 		})
 		qrLastPK := sqltypes.ResultToProto3(newLastPK)
