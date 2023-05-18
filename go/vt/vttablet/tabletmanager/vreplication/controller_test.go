@@ -76,8 +76,9 @@ func TestControllerKeyRange(t *testing.T) {
 
 	dbClientFactory := func() binlogplayer.DBClient { return dbClient }
 	mysqld := &fakemysqldaemon.FakeMysqlDaemon{MysqlPort: sync2.NewAtomicInt32(3306)}
+	vre := NewTestEngine(nil, wantTablet.GetAlias().Cell, mysqld, dbClientFactory, dbClientFactory, dbClient.DBName(), nil)
 
-	ct, err := newController(context.Background(), params, dbClientFactory, mysqld, env.TopoServ, env.Cells[0], "replica", nil, nil)
+	ct, err := newController(context.Background(), params, dbClientFactory, mysqld, env.TopoServ, env.Cells[0], "replica", nil, vre)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,8 +138,9 @@ func TestControllerTables(t *testing.T) {
 			},
 		},
 	}
+	vre := NewTestEngine(nil, wantTablet.GetAlias().Cell, mysqld, dbClientFactory, dbClientFactory, dbClient.DBName(), nil)
 
-	ct, err := newController(context.Background(), params, dbClientFactory, mysqld, env.TopoServ, env.Cells[0], "replica", nil, nil)
+	ct, err := newController(context.Background(), params, dbClientFactory, mysqld, env.TopoServ, env.Cells[0], "replica", nil, vre)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,8 +207,9 @@ func TestControllerOverrides(t *testing.T) {
 
 	dbClientFactory := func() binlogplayer.DBClient { return dbClient }
 	mysqld := &fakemysqldaemon.FakeMysqlDaemon{MysqlPort: sync2.NewAtomicInt32(3306)}
+	vre := NewTestEngine(nil, wantTablet.GetAlias().Cell, mysqld, dbClientFactory, dbClientFactory, dbClient.DBName(), nil)
 
-	ct, err := newController(context.Background(), params, dbClientFactory, mysqld, env.TopoServ, env.Cells[0], "rdonly", nil, nil)
+	ct, err := newController(context.Background(), params, dbClientFactory, mysqld, env.TopoServ, env.Cells[0], "rdonly", nil, vre)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +223,8 @@ func TestControllerOverrides(t *testing.T) {
 }
 
 func TestControllerCanceledContext(t *testing.T) {
-	defer deleteTablet(addTablet(100))
+	wantTablet := addTablet(100)
+	defer deleteTablet(wantTablet)
 
 	params := map[string]string{
 		"id":     "1",
@@ -230,7 +234,9 @@ func TestControllerCanceledContext(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	ct, err := newController(ctx, params, nil, nil, env.TopoServ, env.Cells[0], "rdonly", nil, nil)
+	vre := NewTestEngine(nil, wantTablet.GetAlias().Cell, nil, nil, nil, "", nil)
+
+	ct, err := newController(ctx, params, nil, nil, env.TopoServ, env.Cells[0], "rdonly", nil, vre)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,8 +279,9 @@ func TestControllerRetry(t *testing.T) {
 	dbClient.ExpectRequest("commit", nil, nil)
 	dbClientFactory := func() binlogplayer.DBClient { return dbClient }
 	mysqld := &fakemysqldaemon.FakeMysqlDaemon{MysqlPort: sync2.NewAtomicInt32(3306)}
+	vre := NewTestEngine(nil, env.Cells[0], mysqld, dbClientFactory, dbClientFactory, dbClient.DBName(), nil)
 
-	ct, err := newController(context.Background(), params, dbClientFactory, mysqld, env.TopoServ, env.Cells[0], "rdonly", nil, nil)
+	ct, err := newController(context.Background(), params, dbClientFactory, mysqld, env.TopoServ, env.Cells[0], "rdonly", nil, vre)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,8 +326,9 @@ func TestControllerStopPosition(t *testing.T) {
 
 	dbClientFactory := func() binlogplayer.DBClient { return dbClient }
 	mysqld := &fakemysqldaemon.FakeMysqlDaemon{MysqlPort: sync2.NewAtomicInt32(3306)}
+	vre := NewTestEngine(nil, wantTablet.GetAlias().Cell, mysqld, dbClientFactory, dbClientFactory, dbClient.DBName(), nil)
 
-	ct, err := newController(context.Background(), params, dbClientFactory, mysqld, env.TopoServ, env.Cells[0], "replica", nil, nil)
+	ct, err := newController(context.Background(), params, dbClientFactory, mysqld, env.TopoServ, env.Cells[0], "replica", nil, vre)
 	if err != nil {
 		t.Fatal(err)
 	}

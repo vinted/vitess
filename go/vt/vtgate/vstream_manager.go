@@ -105,6 +105,8 @@ type vstream struct {
 	eventCh           chan []*binlogdatapb.VEvent
 	heartbeatInterval uint32
 	ts                *topo.Server
+
+	tabletPickerOptions discovery.TabletPickerOptions
 }
 
 type journalEvent struct {
@@ -151,6 +153,10 @@ func (vsm *vstreamManager) VStream(ctx context.Context, tabletType topodatapb.Ta
 		eventCh:            make(chan []*binlogdatapb.VEvent),
 		heartbeatInterval:  flags.GetHeartbeatInterval(),
 		ts:                 ts,
+		tabletPickerOptions: discovery.TabletPickerOptions{
+			CellPreference: flags.GetCellPreference(),
+			TabletOrder:    flags.GetTabletOrder(),
+		},
 	}
 	return vs.stream(ctx)
 }
@@ -447,7 +453,7 @@ func (vs *vstream) streamFromTablet(ctx context.Context, sgtid *binlogdatapb.Sha
 		var eventss [][]*binlogdatapb.VEvent
 		var err error
 		cells := vs.getCells()
-		tp, err := discovery.NewTabletPicker(vs.ts, cells, sgtid.Keyspace, sgtid.Shard, vs.tabletType.String())
+		tp, err := discovery.NewTabletPicker(ctx, vs.ts, cells, vs.vsm.cell, sgtid.Keyspace, sgtid.Shard, vs.tabletType.String(), vs.tabletPickerOptions)
 		if err != nil {
 			log.Errorf(err.Error())
 			return err

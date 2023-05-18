@@ -392,7 +392,7 @@ func (tme *testMigraterEnv) createDBClients(ctx context.Context, t *testing.T) {
 		tme.dbSourceClients = append(tme.dbSourceClients, dbclient)
 		dbClientFactory := func() binlogplayer.DBClient { return dbclient }
 		// Replace existing engine with a new one
-		master.TM.VREngine = vreplication.NewTestEngine(tme.ts, "", master.FakeMysqlDaemon, dbClientFactory, dbClientFactory, dbclient.DBName(), nil)
+		master.TM.VREngine = vreplication.NewTestEngine(tme.ts, master.Tablet.GetAlias().GetCell(), master.FakeMysqlDaemon, dbClientFactory, dbClientFactory, dbclient.DBName(), nil)
 		master.TM.VREngine.Open(ctx)
 	}
 	for _, master := range tme.targetMasters {
@@ -401,7 +401,7 @@ func (tme *testMigraterEnv) createDBClients(ctx context.Context, t *testing.T) {
 		tme.dbTargetClients = append(tme.dbTargetClients, dbclient)
 		dbClientFactory := func() binlogplayer.DBClient { return dbclient }
 		// Replace existing engine with a new one
-		master.TM.VREngine = vreplication.NewTestEngine(tme.ts, "", master.FakeMysqlDaemon, dbClientFactory, dbClientFactory, dbclient.DBName(), nil)
+		master.TM.VREngine = vreplication.NewTestEngine(tme.ts, master.Tablet.GetAlias().GetCell(), master.FakeMysqlDaemon, dbClientFactory, dbClientFactory, dbclient.DBName(), nil)
 		master.TM.VREngine.Open(ctx)
 	}
 	tme.allDBClients = append(tme.dbSourceClients, tme.dbTargetClients...)

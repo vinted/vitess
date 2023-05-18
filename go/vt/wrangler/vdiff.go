@@ -572,7 +572,7 @@ func (df *vdiff) selectTablets(ctx context.Context, ts *trafficSwitcher) error {
 			if ts.externalTopo != nil {
 				sourceTopo = ts.externalTopo
 			}
-			tp, err := discovery.NewTabletPicker(sourceTopo, []string{df.sourceCell}, df.ts.sourceKeyspace, shard, df.tabletTypesStr)
+			tp, err := discovery.NewTabletPicker(ctx, sourceTopo, []string{df.sourceCell}, df.sourceCell, df.ts.SourceKeyspaceName(), shard, df.tabletTypesStr, discovery.TabletPickerOptions{})
 			if err != nil {
 				return err
 			}
@@ -590,7 +590,7 @@ func (df *vdiff) selectTablets(ctx context.Context, ts *trafficSwitcher) error {
 	go func() {
 		defer wg.Done()
 		err2 = df.forAll(df.targets, func(shard string, target *shardStreamer) error {
-			tp, err := discovery.NewTabletPicker(df.ts.wr.ts, []string{df.targetCell}, df.ts.targetKeyspace, shard, df.tabletTypesStr)
+			tp, err := discovery.NewTabletPicker(ctx, df.ts.TopoServer(), []string{df.targetCell}, df.targetCell, df.ts.targetKeyspace, shard, df.tabletTypesStr, discovery.TabletPickerOptions{})
 			if err != nil {
 				return err
 			}
