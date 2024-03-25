@@ -142,6 +142,7 @@ const (
 	Expression = querypb.Type_EXPRESSION
 	HexNum     = querypb.Type_HEXNUM
 	HexVal     = querypb.Type_HEXVAL
+	Tuple      = querypb.Type_TUPLE
 )
 
 // bit-shift the mysql flags by two byte so we
