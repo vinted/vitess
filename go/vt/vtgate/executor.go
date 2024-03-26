@@ -398,7 +398,7 @@ func (e *Executor) handleCommit(ctx context.Context, safeSession *SafeSession, l
 	return &sqltypes.Result{}, err
 }
 
-//Commit commits the existing transactions
+// Commit commits the existing transactions
 func (e *Executor) Commit(ctx context.Context, safeSession *SafeSession) error {
 	return e.txConn.Commit(ctx, safeSession)
 }
@@ -1046,6 +1046,8 @@ func (e *Executor) StreamExecute(ctx context.Context, method string, safeSession
 	switch plan.Type {
 	case sqlparser.StmtBegin, sqlparser.StmtCommit, sqlparser.StmtRollback:
 		return vterrors.Errorf(vtrpcpb.Code_UNIMPLEMENTED, "OLAP does not supported statement type: %s", plan.Type)
+	case sqlparser.StmtBoost:
+		return e.handleBoost(ctx, safeSession, plan, bindVars, callback)
 	}
 
 	err = e.addNeededBindVars(plan.BindVarNeeds, bindVars, safeSession)
@@ -1222,6 +1224,23 @@ func (e *Executor) getPlan(vcursor *vcursorImpl, sql string, comments sqlparser.
 	planKey := vcursor.planPrefixKey() + ":" + query
 	if plan, ok := e.plans.Get(planKey); ok {
 		return plan.(*engine.Plan), nil
+	}
+
+	isBoosted := true
+
+	if isBoosted {
+		plan, err := planbuilder.BuildBoost(query, statement)
+		if err != nil {
+			return nil, err
+		}
+
+		plan.Warnings = vcursor.warnings
+		vcursor.warnings = nil
+
+		if !skipQueryPlanCache && !sqlparser.SkipQueryPlanCacheDirective(statement) && sqlparser.CachePlan(statement) {
+			e.plans.Set(planKey, plan)
+		}
+		return plan, nil
 	}
 
 	plan, err := planbuilder.BuildFromStmt(query, statement, reservedVars, vcursor, bindVarNeeds, *enableOnlineDDL, *enableDirectDDL)
@@ -1510,4 +1529,12 @@ func (e *Executor) startVStream(ctx context.Context, rss []*srvtopo.ResolvedShar
 	}
 	vs.stream(ctx)
 	return nil
+}
+
+// Instead of mysql query, query Redis with custom-built key
+func (e *Executor) handleBoost(ctx context.Context, session *SafeSession, plan *engine.Plan, vars map[string]*querypb.BindVariable, callback func(*sqltypes.Result) error) error {
+
+	panic("not implemented")
+	return nil
+
 }

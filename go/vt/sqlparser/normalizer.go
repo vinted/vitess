@@ -39,10 +39,12 @@ func Normalize(stmt Statement, reserved *ReservedVars, bindVars map[string]*quer
 }
 
 type normalizer struct {
-	bindVars map[string]*querypb.BindVariable
-	reserved *ReservedVars
-	vals     map[string]string
-	err      error
+	bindVars      map[string]*querypb.BindVariable
+	reserved      *ReservedVars
+	vals          map[string]string
+	columns       map[string]string
+	currentColumn string
+	err           error
 }
 
 func newNormalizer(reserved *ReservedVars, bindVars map[string]*querypb.BindVariable) *normalizer {
@@ -50,6 +52,7 @@ func newNormalizer(reserved *ReservedVars, bindVars map[string]*querypb.BindVari
 		bindVars: bindVars,
 		reserved: reserved,
 		vals:     make(map[string]string),
+		columns:  make(map[string]string),
 	}
 }
 
@@ -86,7 +89,10 @@ func (nz *normalizer) WalkSelect(cursor *Cursor) bool {
 		nz.convertLiteralDedup(node, cursor)
 	case *ComparisonExpr:
 		nz.convertComparison(node)
-	case *ColName, TableName:
+	case *ColName:
+		nz.currentColumn = node.Name.String()
+		return false
+	case *TableName:
 		// Common node types that never contain Literals or ListArgs but create a lot of object
 		// allocations.
 		return false
@@ -134,6 +140,11 @@ func (nz *normalizer) convertLiteralDedup(node *Literal, cursor *Cursor) {
 		nz.bindVars[bvname] = bval
 	}
 
+	// <BOOST> Store the column to bind var mapping.
+	if nz.currentColumn != "" && !ok {
+		nz.columns[nz.currentColumn] = bvname
+	}
+
 	// Modify the AST node to a bindvar.
 	cursor.Replace(NewArgument(bvname))
 }
@@ -147,6 +158,11 @@ func (nz *normalizer) convertLiteral(node *Literal, cursor *Cursor) {
 
 	bvname := nz.reserved.nextUnusedVar()
 	nz.bindVars[bvname] = bval
+
+	// <BOOST> Store the column to bind var mapping.
+	if nz.currentColumn != "" {
+		nz.columns[nz.currentColumn] = bvname
+	}
 
 	cursor.Replace(NewArgument(bvname))
 }
