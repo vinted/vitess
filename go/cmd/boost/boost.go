@@ -20,7 +20,9 @@ var (
 	targetHost,
 	targetGtid,
 	targetFilter,
-	targetTabletType string
+	targetColumns,
+	targetTabletType,
+	redisAddr string
 
 	boostFlags = []string{
 		"host",
@@ -28,7 +30,9 @@ var (
 		"grpcPort",
 		"gtid",
 		"filter",
+		"columns",
 		"tabletType",
+		"redisAddr",
 	}
 )
 
@@ -70,11 +74,13 @@ func flagUsage(f *flag.Flag) {
 }
 
 func init() {
+	flag.StringVar(&redisAddr, "redisAddr", "127.0.0.1:6379", "(defaults to 127.0.0.1:6379)")
 	flag.StringVar(&targetHost, "host", "127.0.0.1", "(defaults to 127.0.0.1)")
 	flag.IntVar(&targetPort, "port", 15306, "(defaults to 15306)")
 	flag.IntVar(&targetGrpcPort, "grpcPort", 15991, "(defaults to 15991)")
 	flag.StringVar(&targetGtid, "gtid", "{}", "(defaults to {})")
 	flag.StringVar(&targetFilter, "filter", "{}", "(defaults to{})")
+	flag.StringVar(&targetColumns, "columns", "id,user_id", "(defaults to id)")
 	flag.StringVar(&targetTabletType, "tabletType", "master", "(defaults to{})")
 	logger := logutil.NewConsoleLogger()
 	flag.CommandLine.SetOutput(logutil.NewLoggerWriter(logger))
@@ -92,7 +98,9 @@ func main() {
 		targetHost,
 		targetGtid,
 		targetFilter,
+		targetColumns,
 		targetTabletType,
+		redisAddr,
 	)
 	if err != nil {
 		os.Exit(1)

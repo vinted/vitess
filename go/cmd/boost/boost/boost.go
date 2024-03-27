@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"vitess.io/vitess/go/cache/redis"
 	"vitess.io/vitess/go/json2"
 	"vitess.io/vitess/go/mysql"
 	"vitess.io/vitess/go/vt/binlog/binlogplayer"
@@ -24,16 +25,18 @@ import (
 )
 
 type BoostConfig struct {
-	Host       string
-	Port       int
-	GrpcPort   int
-	User       string
-	Password   string
-	Gtid       *binlogdatapb.VGtid
-	Filter     *binlogdatapb.Filter
-	TabletType topodatapb.TabletType
-	Source     string
-	Flags      vtgatepb.VStreamFlags
+	Host         string
+	Port         int
+	GrpcPort     int
+	User         string
+	Password     string
+	Gtid         *binlogdatapb.VGtid
+	Filter       *binlogdatapb.Filter
+	RedisColumns []string
+	TabletType   topodatapb.TabletType
+	Source       string
+	Flags        vtgatepb.VStreamFlags
+	RedisAddr    string
 }
 
 type Boost struct {
@@ -41,7 +44,7 @@ type Boost struct {
 	player *vplayer
 }
 
-func NewBoost(port, grpcPort int, host, gtid, filter, tabletType string) (*Boost, error) {
+func NewBoost(port, grpcPort int, host, gtid, filter, columns, tabletType, redisAddr string) (*Boost, error) {
 	targetVgtid := &binlogdatapb.VGtid{}
 	targetFilter := &binlogdatapb.Filter{}
 	if err := json2.Unmarshal([]byte(gtid), &targetVgtid); err != nil {
@@ -54,15 +57,17 @@ func NewBoost(port, grpcPort int, host, gtid, filter, tabletType string) (*Boost
 	}
 
 	cfg := &BoostConfig{
-		Host:     host,
-		Port:     port,
-		GrpcPort: grpcPort,
-		Gtid:     targetVgtid,
-		Filter:   targetFilter,
+		Host:         host,
+		Port:         port,
+		GrpcPort:     grpcPort,
+		Gtid:         targetVgtid,
+		Filter:       targetFilter,
+		RedisColumns: strings.Split(columns, ","),
 		Flags: vtgatepb.VStreamFlags{
 			//MinimizeSkew:      false,
 			HeartbeatInterval: 60, //seconds
 		},
+		RedisAddr: redisAddr,
 	}
 	switch tabletType {
 	case "replica":
@@ -93,6 +98,8 @@ func (b *Boost) Init() error {
 		),
 	)
 
+	cache := redis.NewCacheParams(b.config.RedisAddr, "", 0)
+
 	// for event aplicator
 	colInfo, err := buildColInfoMap(context.Background(), dbPool)
 	if err != nil {
@@ -102,9 +109,11 @@ func (b *Boost) Init() error {
 
 	replicatorPlan, err := buildReplicatorPlan(
 		b.config.Filter,
+
 		colInfo,
 		nil,
 		binlogplayer.NewStats(),
+		b.config.RedisColumns,
 	)
 	if err != nil {
 		log.Error("---- buildReplicatorPlan", err)
@@ -116,6 +125,7 @@ func (b *Boost) Init() error {
 		dbPool:         dbPool,
 		replicatorPlan: replicatorPlan,
 		tablePlans:     make(map[string]*TablePlan),
+		cache:          cache,
 	}
 	return nil
 }

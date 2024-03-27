@@ -31,13 +31,14 @@ type tablePlanBuilder struct {
 	// selColumns keeps track of the columns we want to pull from source.
 	// If Lastpk is set, we compare this list against the table's pk and
 	// add missing references.
-	selColumns map[string]bool
-	colExprs   []*colExpr
-	onInsert   insertType
-	pkCols     []*colExpr
-	lastpk     *sqltypes.Result
-	colInfos   []*vreplication.ColumnInfo
-	stats      *binlogplayer.Stats
+	selColumns   map[string]bool
+	colExprs     []*colExpr
+	onInsert     insertType
+	pkCols       []*colExpr
+	lastpk       *sqltypes.Result
+	colInfos     []*vreplication.ColumnInfo
+	stats        *binlogplayer.Stats
+	RedisColumns []string
 }
 
 // colExpr describes the processing to be performed to
@@ -107,13 +108,14 @@ const (
 // The TablePlan built is a partial plan. The full plan for a table is built
 // when we receive field information from events or rows sent by the source.
 // buildExecutionPlan is the function that builds the full plan.
-func buildReplicatorPlan(filter *binlogdatapb.Filter, colInfoMap map[string][]*vreplication.ColumnInfo, copyState map[string]*sqltypes.Result, stats *binlogplayer.Stats) (*ReplicatorPlan, error) {
+func buildReplicatorPlan(filter *binlogdatapb.Filter, colInfoMap map[string][]*vreplication.ColumnInfo, copyState map[string]*sqltypes.Result, stats *binlogplayer.Stats, redisColumns []string) (*ReplicatorPlan, error) {
 	plan := &ReplicatorPlan{
 		VStreamFilter: &binlogdatapb.Filter{FieldEventMode: filter.FieldEventMode},
 		TargetTables:  make(map[string]*TablePlan),
 		TablePlans:    make(map[string]*TablePlan),
 		ColInfoMap:    colInfoMap,
 		stats:         stats,
+		RedisColumns:  redisColumns,
 	}
 	for tableName := range colInfoMap {
 		lastpk, ok := copyState[tableName]
@@ -128,7 +130,7 @@ func buildReplicatorPlan(filter *binlogdatapb.Filter, colInfoMap map[string][]*v
 		if rule == nil {
 			continue
 		}
-		tablePlan, err := buildTablePlan(tableName, rule, colInfoMap, lastpk, stats)
+		tablePlan, err := buildTablePlan(tableName, rule, colInfoMap, lastpk, stats, redisColumns)
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +169,7 @@ func MatchTable(tableName string, filter *binlogdatapb.Filter) (*binlogdatapb.Ru
 	return nil, nil
 }
 
-func buildTablePlan(tableName string, rule *binlogdatapb.Rule, colInfoMap map[string][]*vreplication.ColumnInfo, lastpk *sqltypes.Result, stats *binlogplayer.Stats) (*TablePlan, error) {
+func buildTablePlan(tableName string, rule *binlogdatapb.Rule, colInfoMap map[string][]*vreplication.ColumnInfo, lastpk *sqltypes.Result, stats *binlogplayer.Stats, redisColumns []string) (*TablePlan, error) {
 	filter := rule.Filter
 	query := filter
 	// generate equivalent select statement if filter is empty or a keyrange.
@@ -214,6 +216,7 @@ func buildTablePlan(tableName string, rule *binlogdatapb.Rule, colInfoMap map[st
 			Stats:          stats,
 			EnumValuesMap:  enumValuesMap,
 			ConvertCharset: rule.ConvertCharset,
+			RedisColumns:   redisColumns,
 		}
 
 		return tablePlan, nil
@@ -225,10 +228,11 @@ func buildTablePlan(tableName string, rule *binlogdatapb.Rule, colInfoMap map[st
 			From:  sel.From,
 			Where: sel.Where,
 		},
-		selColumns: make(map[string]bool),
-		lastpk:     lastpk,
-		colInfos:   colInfoMap[tableName],
-		stats:      stats,
+		selColumns:   make(map[string]bool),
+		lastpk:       lastpk,
+		colInfos:     colInfoMap[tableName],
+		stats:        stats,
+		RedisColumns: redisColumns,
 	}
 
 	if err := tpb.analyzeExprs(sel.SelectExprs); err != nil {
@@ -310,6 +314,7 @@ func (tpb *tablePlanBuilder) generate() *TablePlan {
 		PKReferences:     pkrefs,
 		Stats:            tpb.stats,
 		FieldsToSkip:     fieldsToSkip,
+		RedisColumns:     tpb.RedisColumns,
 	}
 }
 
