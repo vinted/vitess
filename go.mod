@@ -23,6 +23,7 @@ require (
 	github.com/dave/jennifer v1.4.1
 	github.com/evanphx/json-patch v4.5.0+incompatible
 	github.com/go-martini/martini v0.0.0-20170121215854-22fa46961aab
+	github.com/go-redis/redis/v7 v7.4.1
 	github.com/go-sql-driver/mysql v1.5.1-0.20210202043019-fe2230a8b20c
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/mock v1.5.0
@@ -77,7 +78,6 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/common v0.29.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
-	github.com/redis/go-redis/v9 v9.5.1
 	github.com/samuel/go-zookeeper v0.0.0-20200724154423-2164a8ac840e
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/sjmudd/stopwatch v0.0.0-20170613150411-f380bf8a9be1
