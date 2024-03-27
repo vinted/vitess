@@ -18,7 +18,10 @@ package vtgate
 
 import (
 	"context"
+	"fmt"
 	"time"
+	"vitess.io/vitess/go/cache/redis"
+	"vitess.io/vitess/go/vt/vtgate/boost"
 
 	"vitess.io/vitess/go/sqltypes"
 	querypb "vitess.io/vitess/go/vt/proto/query"
@@ -121,13 +124,45 @@ func (e *Executor) newExecute(ctx context.Context, safeSession *SafeSession, sql
 	}
 
 	// Check if boosted and hit Redis
-	// plan.BoostPlanConfig.IsBoosted == true
+
+	if plan.BoostPlanConfig != nil && plan.BoostPlanConfig.IsBoosted {
+		cacheKey := cacheKey(plan.BoostPlanConfig, bindVars)
+
+		fmt.Println("Cache Key: ", cacheKey)
+
+		redisResults, err := e.boostCache.Get(cacheKey)
+
+		fmt.Println("Redis Results: ", redisResults)
+		fmt.Println("Error: ", err)
+	}
 
 	statementTypeResult, sqlResult, err := e.executePlan(ctx, plan, vcursor, bindVars, execStart)(logStats, safeSession)
 
 	// Maybe store in Redis here if boosted, but cache miss
 
 	return statementTypeResult, sqlResult, err
+}
+
+func cacheKey(config *boost.PlanConfig, vars map[string]*querypb.BindVariable) string {
+	return redis.GenerateCacheKey(cacheKeyParams(config, vars)...)
+}
+
+func cacheKeyParams(boostConfig *boost.PlanConfig, vars map[string]*querypb.BindVariable) []string {
+	var allColumns []string
+	var allValues []string
+
+	for key, vtgValueKey := range boostConfig.Columns {
+		allColumns = append(allColumns, key)
+
+		var byteArray = vars[vtgValueKey].Value
+		var stringValue = string(byteArray)
+
+		allValues = append(allValues, stringValue)
+	}
+
+	tail := append(allColumns, allValues...)
+
+	return append([]string{boostConfig.Table}, tail...)
 }
 
 func (e *Executor) startTxIfNecessary(ctx context.Context, safeSession *SafeSession) error {

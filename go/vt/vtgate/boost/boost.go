@@ -3,14 +3,15 @@ package boost
 type Columns map[string]string
 
 type PlanConfig struct {
-	IsBoosted    bool
-	BoostColumns Columns
+	IsBoosted bool
+	Columns   Columns
+	Table     string
 }
 
 func NonBoostedPlanConfig() *PlanConfig {
 	return &PlanConfig{
-		IsBoosted:    false,
-		BoostColumns: Columns{},
+		IsBoosted: false,
+		Columns:   Columns{},
 	}
 }
 
