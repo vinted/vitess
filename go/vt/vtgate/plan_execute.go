@@ -121,6 +121,7 @@ func (e *Executor) newExecute(ctx context.Context, safeSession *SafeSession, sql
 	}
 
 	// Check if boosted and hit Redis
+	// plan.BoostPlanConfig.IsBoosted == true
 
 	statementTypeResult, sqlResult, err := e.executePlan(ctx, plan, vcursor, bindVars, execStart)(logStats, safeSession)
 
