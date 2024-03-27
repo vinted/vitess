@@ -28,6 +28,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"vitess.io/vitess/go/cache/redis"
 	"vitess.io/vitess/go/vt/vtgate/boost"
 
 	"vitess.io/vitess/go/acl"
@@ -103,6 +104,7 @@ type Executor struct {
 	schemaTracker SchemaInfo
 
 	queryFilterConfigs *boost.QueryFilterConfigs
+	boostCache         *redis.Cache
 }
 
 var executorOnce sync.Once
@@ -122,6 +124,7 @@ func NewExecutor(
 	cacheCfg *cache.Config,
 	schemaTracker SchemaInfo,
 	queryFilterConfigs *boost.QueryFilterConfigs,
+	boostCache *redis.Cache,
 ) *Executor {
 	e := &Executor{
 		serv:               serv,
@@ -135,6 +138,7 @@ func NewExecutor(
 		streamSize:         streamSize,
 		schemaTracker:      schemaTracker,
 		queryFilterConfigs: queryFilterConfigs,
+		boostCache:         boostCache,
 	}
 
 	vschemaacl.Init()
@@ -1257,8 +1261,9 @@ func configForBoost(configs *boost.QueryFilterConfigs, columns boost.Columns, in
 
 				if keysMatch(columns, filterConfig.Columns) {
 					return &boost.PlanConfig{
-						IsBoosted:    true,
-						BoostColumns: columns,
+						IsBoosted: true,
+						Columns:   columns,
+						Table:     tableName,
 					}
 				}
 			}
