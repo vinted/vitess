@@ -26,6 +26,20 @@ func NewCache() *Cache {
 	}
 }
 
+func NewCacheParams(addr, password string, DB int) *Cache {
+	opts := &gredis.Options{
+		Addr:     addr,
+		Password: password,
+		DB:       DB,
+	}
+
+	client := gredis.NewClient(opts)
+
+	return &Cache{
+		client: client,
+	}
+}
+
 func (c *Cache) Get(key string) (string, error) {
 	return c.client.Get(key).Result()
 }

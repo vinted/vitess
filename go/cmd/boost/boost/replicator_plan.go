@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"vitess.io/vitess/go/bytes2"
+	"vitess.io/vitess/go/cache/redis"
 	"vitess.io/vitess/go/mysql"
 	"vitess.io/vitess/go/sqltypes"
 	"vitess.io/vitess/go/vt/binlog/binlogplayer"
@@ -40,6 +41,7 @@ type ReplicatorPlan struct {
 	TablePlans    map[string]*TablePlan
 	ColInfoMap    map[string][]*vreplication.ColumnInfo
 	stats         *binlogplayer.Stats
+	RedisColumns  []string
 }
 
 // buildExecution plan uses the field info as input and the partially built
@@ -83,10 +85,11 @@ func (rp *ReplicatorPlan) buildExecutionPlan(fieldEvent *binlogdatapb.FieldEvent
 // requires us to wait for the field info sent by the source.
 func (rp *ReplicatorPlan) buildFromFields(tableName string, lastpk *sqltypes.Result, fields []*querypb.Field) (*TablePlan, error) {
 	tpb := &tablePlanBuilder{
-		name:     sqlparser.NewTableIdent(tableName),
-		lastpk:   lastpk,
-		colInfos: rp.ColInfoMap[tableName],
-		stats:    rp.stats,
+		name:         sqlparser.NewTableIdent(tableName),
+		lastpk:       lastpk,
+		colInfos:     rp.ColInfoMap[tableName],
+		stats:        rp.stats,
+		RedisColumns: rp.RedisColumns,
 	}
 	for _, field := range fields {
 		colName := sqlparser.NewColIdent(field.Name)
@@ -188,6 +191,7 @@ type TablePlan struct {
 	Stats          *binlogplayer.Stats
 	FieldsToSkip   map[string]bool
 	ConvertCharset map[string](*binlogdatapb.CharsetConversion)
+	RedisColumns   []string
 }
 
 // MarshalJSON performs a custom JSON Marshalling.
@@ -370,6 +374,61 @@ func (tp *TablePlan) applyChange(rowChange *binlogdatapb.RowChange, executor fun
 	}
 	// Unreachable.
 	return nil, nil
+}
+
+func check(field string, b []string) bool {
+	for i := range b {
+		if field == b[i] {
+			return true
+		}
+	}
+	return false
+}
+
+// applyChange generate mysql statement
+func (tp *TablePlan) applyRedisChange(rowChange *binlogdatapb.RowChange, executor func(string) (*sqltypes.Result, error)) (*sqltypes.Result, error) {
+	var before, after bool
+	// insert uses after -> need after
+	// delete uses before -> need before
+	// update uses before/after -> need before
+	if rowChange.Before != nil {
+		before = true
+	}
+	if rowChange.After != nil {
+		after = true
+	}
+	bindvarsStr := append([]string{tp.TargetName}, tp.RedisColumns...)
+	if rowChange.Before != nil {
+		before = true
+	}
+	if rowChange.After != nil {
+		after = true
+	}
+	if !before && after {
+		vals := sqltypes.MakeRowTrusted(tp.Fields, rowChange.After)
+		for i, field := range tp.Fields {
+			bindVar, err := tp.bindFieldVal(field, &vals[i])
+			if err != nil {
+				return nil, err
+			}
+			if check(field.Name, tp.RedisColumns) {
+				bindvarsStr = append(bindvarsStr, string(bindVar.GetValue()))
+			}
+		}
+	} else {
+		vals := sqltypes.MakeRowTrusted(tp.Fields, rowChange.Before)
+		for i, field := range tp.Fields {
+			bindVar, err := tp.bindFieldVal(field, &vals[i])
+			if err != nil {
+				return nil, err
+			}
+			if check(field.Name, tp.RedisColumns) {
+				bindvarsStr = append(bindvarsStr, string(bindVar.GetValue()))
+			}
+		}
+	}
+	// fmt.Println("bind vars STR %s", bindvarsStr)
+	return executor(redis.GenerateCacheKey(bindvarsStr...))
 }
 
 func execParsedQuery(pq *sqlparser.ParsedQuery, bindvars map[string]*querypb.BindVariable, executor func(string) (*sqltypes.Result, error)) (*sqltypes.Result, error) {

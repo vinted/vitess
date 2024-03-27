@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"vitess.io/vitess/go/cache/redis"
 	"vitess.io/vitess/go/sqltypes"
 	"vitess.io/vitess/go/vt/dbconnpool"
 	"vitess.io/vitess/go/vt/log"
@@ -20,6 +21,7 @@ type vplayer struct {
 	currentVgtid *binlogdatapb.VGtid
 	// fields       []*querypb.Field
 	dbPool *dbconnpool.ConnectionPool
+	cache  *redis.Cache
 }
 
 func (vp *vplayer) applyVEvent(ctx context.Context, event *binlogdatapb.VEvent) error {
@@ -65,11 +67,15 @@ func (vp *vplayer) applyRowEvent(ctx context.Context, rowEvent *binlogdatapb.Row
 		return fmt.Errorf("unexpected event on table %s", rowEvent.TableName)
 	}
 	for _, change := range rowEvent.RowChanges {
-		_, err := tplan.applyChange(change, func(sql string) (*sqltypes.Result, error) {
+		_, err := tplan.applyRedisChange(change, func(key string) (*sqltypes.Result, error) {
+			// this one for Mysql change
+			// _, err := tplan.applyChange(change, func(sql string) (*sqltypes.Result, error) {
 			// stats := NewVrLogStats("ROWCHANGE")
 			// start := time.Now()
-			fmt.Println(sql)
-			return nil, nil
+			log.Infof("Deleting key: %s", key)
+			err := vp.cache.Delete(key)
+			// fmt.Println(sql)
+			return nil, err
 			// qr, err := vp.dbClient.ExecuteWithRetry(ctx, sql)
 			// vp.vr.stats.QueryCount.Add(vp.phase, 1)
 			// vp.vr.stats.QueryTimings.Record(vp.phase, start)
