@@ -25,6 +25,8 @@ import (
 	"os"
 	"strings"
 	"time"
+	"vitess.io/vitess/go/cache/redis"
+	"vitess.io/vitess/go/vt/vtgate/boost"
 
 	"vitess.io/vitess/go/vt/key"
 
@@ -157,7 +159,7 @@ type RegisterVTGate func(vtgateservice.VTGateService)
 var RegisterVTGates []RegisterVTGate
 
 // Init initializes VTGate server.
-func Init(ctx context.Context, serv srvtopo.Server, cell string, tabletTypesToWait []topodatapb.TabletType) *VTGate {
+func Init(ctx context.Context, serv srvtopo.Server, cell string, tabletTypesToWait []topodatapb.TabletType, boostQueryFilterConfigPath *string) *VTGate {
 	if rpcVTGate != nil {
 		log.Fatalf("VTGate already initialized")
 	}
@@ -214,7 +216,10 @@ func Init(ctx context.Context, serv srvtopo.Server, cell string, tabletTypesToWa
 		LFU:            *queryPlanCacheLFU,
 	}
 
-	executor := NewExecutor(ctx, serv, cell, resolver, *normalizeQueries, *warnShardedOnly, *streamBufferSize, cacheCfg, si)
+	queryFilterConfigs, _ := boost.Load(boostQueryFilterConfigPath)
+	boostCache := redis.NewCache()
+
+	executor := NewExecutor(ctx, serv, cell, resolver, *normalizeQueries, *warnShardedOnly, *streamBufferSize, cacheCfg, si, queryFilterConfigs, boostCache)
 
 	// connect the schema tracker with the vschema manager
 	if *enableSchemaChangeSignal {
@@ -617,8 +622,11 @@ func LegacyInit(ctx context.Context, hc discovery.LegacyHealthCheck, serv srvtop
 		LFU:            *queryPlanCacheLFU,
 	}
 
+	queryFilterConfigs := &boost.QueryFilterConfigs{}
+	boostCache := redis.NewCache()
+
 	rpcVTGate = &VTGate{
-		executor: NewExecutor(ctx, serv, cell, resolver, *normalizeQueries, *warnShardedOnly, *streamBufferSize, cacheCfg, nil),
+		executor: NewExecutor(ctx, serv, cell, resolver, *normalizeQueries, *warnShardedOnly, *streamBufferSize, cacheCfg, nil, queryFilterConfigs, boostCache),
 		resolver: resolver,
 		vsm:      vsm,
 		txConn:   tc,
