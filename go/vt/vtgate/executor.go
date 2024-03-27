@@ -1047,8 +1047,6 @@ func (e *Executor) StreamExecute(ctx context.Context, method string, safeSession
 	switch plan.Type {
 	case sqlparser.StmtBegin, sqlparser.StmtCommit, sqlparser.StmtRollback:
 		return vterrors.Errorf(vtrpcpb.Code_UNIMPLEMENTED, "OLAP does not supported statement type: %s", plan.Type)
-		//case sqlparser.StmtBoost:
-		//	return e.handleBoost(ctx, safeSession, plan, bindVars, callback)
 	}
 
 	err = e.addNeededBindVars(plan.BindVarNeeds, bindVars, safeSession)
@@ -1547,12 +1545,3 @@ func (e *Executor) startVStream(ctx context.Context, rss []*srvtopo.ResolvedShar
 	vs.stream(ctx)
 	return nil
 }
-
-//
-//// Instead of mysql query, query Redis with custom-built key
-//func (e *Executor) handleBoost(ctx context.Context, session *SafeSession, plan *engine.Plan, vars map[string]*querypb.BindVariable, callback func(*sqltypes.Result) error) error {
-//
-//	panic("not implemented")
-//	return nil
-//
-//}

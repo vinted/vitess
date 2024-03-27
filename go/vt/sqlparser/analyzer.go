@@ -63,8 +63,6 @@ const (
 	StmtCallProc
 	StmtRevert
 	StmtShowMigrationLogs
-
-	StmtBoost
 )
 
 // ASTToStatementType returns a StatementType from an AST stmt

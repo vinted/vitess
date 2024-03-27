@@ -122,14 +122,6 @@ func BuildFromStmt(query string, stmt sqlparser.Statement, reservedVars *sqlpars
 	return plan, nil
 }
 
-//func BuildBoost(query string, stmt sqlparser.Statement) (*engine.Plan, error) {
-//	return &engine.Plan{
-//		Type:         sqlparser.StmtBoost,
-//		Instructions: &engine.EmptyPrimitive{},
-//		BindVarNeeds: &sqlparser.BindVarNeeds{},
-//	}, nil
-//}
-
 func getConfiguredPlanner(vschema ContextVSchema) (selectPlanner, error) {
 	switch vschema.Planner() {
 	case Gen4, Gen4Left2Right, Gen4GreedyOnly:
