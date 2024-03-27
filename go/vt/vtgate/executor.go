@@ -1214,7 +1214,7 @@ func (e *Executor) getPlan(vcursor *vcursorImpl, sql string, comments sqlparser.
 		statement = result.AST
 		bindVarNeeds = result.BindVarNeeds
 		query = sqlparser.String(statement)
-		boostPlanConfig = configForBoost(result.Columns, "x")
+		boostPlanConfig = configForBoost(result.Columns, "<TODO>")
 	}
 
 	if logStats != nil {
@@ -1242,6 +1242,7 @@ func (e *Executor) getPlan(vcursor *vcursorImpl, sql string, comments sqlparser.
 	return plan, nil
 }
 
+// TODO
 func configForBoost(columns boost.Columns, table string) *boost.PlanConfig {
 	configColumns := map[string]string{
 		"user_id": "1337",
