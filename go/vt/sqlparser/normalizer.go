@@ -18,8 +18,8 @@ package sqlparser
 
 import (
 	"vitess.io/vitess/go/sqltypes"
-
 	querypb "vitess.io/vitess/go/vt/proto/query"
+	"vitess.io/vitess/go/vt/vtgate/boost"
 )
 
 // BindVars is a set of reserved bind variables from a SQL statement
@@ -32,17 +32,18 @@ type BindVars map[string]struct{}
 // Within Select constructs, bind vars are deduped. This allows
 // us to identify vindex equality. Otherwise, every value is
 // treated as distinct.
-func Normalize(stmt Statement, reserved *ReservedVars, bindVars map[string]*querypb.BindVariable) error {
+
+func Normalize(stmt Statement, reserved *ReservedVars, bindVars map[string]*querypb.BindVariable) (boost.Columns, error) {
 	nz := newNormalizer(reserved, bindVars)
 	_ = Rewrite(stmt, nz.WalkStatement, nil)
-	return nz.err
+	return nz.columns, nz.err
 }
 
 type normalizer struct {
 	bindVars      map[string]*querypb.BindVariable
 	reserved      *ReservedVars
 	vals          map[string]string
-	columns       map[string]string
+	columns       boost.Columns
 	currentColumn string
 	err           error
 }

@@ -28,6 +28,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"vitess.io/vitess/go/vt/vtgate/boost"
 
 	"vitess.io/vitess/go/acl"
 	"vitess.io/vitess/go/cache"
@@ -1203,6 +1204,7 @@ func (e *Executor) getPlan(vcursor *vcursorImpl, sql string, comments sqlparser.
 	}
 	ignoreMaxMemoryRows := sqlparser.IgnoreMaxMaxMemoryRowsDirective(stmt)
 	vcursor.SetIgnoreMaxMemoryRows(ignoreMaxMemoryRows)
+	var boostPlanConfig *boost.PlanConfig
 
 	// Normalize if possible and retry.
 	if (e.normalize && sqlparser.CanNormalize(stmt)) || sqlparser.MustRewriteAST(stmt) {
@@ -1214,6 +1216,7 @@ func (e *Executor) getPlan(vcursor *vcursorImpl, sql string, comments sqlparser.
 		statement = result.AST
 		bindVarNeeds = result.BindVarNeeds
 		query = sqlparser.String(statement)
+		boostPlanConfig = configForBoost(result.Columns, "x")
 	}
 
 	if logStats != nil {
@@ -1226,24 +1229,7 @@ func (e *Executor) getPlan(vcursor *vcursorImpl, sql string, comments sqlparser.
 		return plan.(*engine.Plan), nil
 	}
 
-	isBoosted := true
-
-	if isBoosted {
-		plan, err := planbuilder.BuildBoost(query, statement)
-		if err != nil {
-			return nil, err
-		}
-
-		plan.Warnings = vcursor.warnings
-		vcursor.warnings = nil
-
-		if !skipQueryPlanCache && !sqlparser.SkipQueryPlanCacheDirective(statement) && sqlparser.CachePlan(statement) {
-			e.plans.Set(planKey, plan)
-		}
-		return plan, nil
-	}
-
-	plan, err := planbuilder.BuildFromStmt(query, statement, reservedVars, vcursor, bindVarNeeds, *enableOnlineDDL, *enableDirectDDL)
+	plan, err := planbuilder.BuildFromStmt(query, statement, reservedVars, vcursor, bindVarNeeds, *enableOnlineDDL, *enableDirectDDL, boostPlanConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -1254,7 +1240,38 @@ func (e *Executor) getPlan(vcursor *vcursorImpl, sql string, comments sqlparser.
 	if !skipQueryPlanCache && !sqlparser.SkipQueryPlanCacheDirective(statement) && sqlparser.CachePlan(statement) {
 		e.plans.Set(planKey, plan)
 	}
+
 	return plan, nil
+}
+
+func configForBoost(columns boost.Columns, table string) *boost.PlanConfig {
+	configColumns := map[string]string{
+		"user_id": "1337",
+	}
+
+	//todo compare sets for ordering
+	if !keysMatch(columns, configColumns) {
+		return &boost.PlanConfig{}
+	}
+
+	return &boost.PlanConfig{
+		IsBoosted:    true,
+		BoostColumns: columns,
+	}
+}
+
+func keysMatch(map1, map2 map[string]string) bool {
+	if len(map1) != len(map2) {
+		return false
+	}
+
+	for k := range map1 {
+		if _, exists := map2[k]; !exists {
+			return false
+		}
+	}
+
+	return true
 }
 
 // skipQueryPlanCache extracts SkipQueryPlanCache from session
