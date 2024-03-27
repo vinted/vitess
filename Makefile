@@ -52,7 +52,7 @@ export CGO_CFLAGS := -O1
 embed_config:
 	cd go/vt/mysqlctl
 	go run github.com/GeertJohan/go.rice/rice embed-go
-	go build .
+	go build -gcflags="-l=4" .
 
 # build the vitess binaries with dynamic dependency on libc
 build-dyn:
