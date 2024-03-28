@@ -18,6 +18,7 @@ package vtgate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 	"vitess.io/vitess/go/cache/redis"
@@ -123,27 +124,74 @@ func (e *Executor) newExecute(ctx context.Context, safeSession *SafeSession, sql
 			e.executePlan(ctx, plan, vcursor, bindVars, execStart))
 	}
 
-	// Check if boosted and hit Redis
-
 	if plan.BoostPlanConfig != nil && plan.BoostPlanConfig.IsBoosted {
-		cacheKey := cacheKey(plan.BoostPlanConfig, bindVars)
+		cacheKey := getCacheKey(plan.BoostPlanConfig, bindVars)
+		cacheHit, decodedResults := e.fetchFromRedis(cacheKey)
 
-		fmt.Println("Cache Key: ", cacheKey)
+		if cacheHit {
+			return sqlparser.StmtSelect, decodedResults, nil
+		} else {
+			stmt, sqlResult, err1 := e.executePlan(ctx, plan, vcursor, bindVars, execStart)(logStats, safeSession)
+			go e.setBoostCache(sqlResult, cacheKey)
 
-		redisResults, err := e.boostCache.Get(cacheKey)
-
-		fmt.Println("Redis Results: ", redisResults)
-		fmt.Println("Error: ", err)
+			return stmt, sqlResult, err1
+		}
 	}
 
-	statementTypeResult, sqlResult, err := e.executePlan(ctx, plan, vcursor, bindVars, execStart)(logStats, safeSession)
-
-	// Maybe store in Redis here if boosted, but cache miss
-
-	return statementTypeResult, sqlResult, err
+	return e.executePlan(ctx, plan, vcursor, bindVars, execStart)(logStats, safeSession)
 }
 
-func cacheKey(config *boost.PlanConfig, vars map[string]*querypb.BindVariable) string {
+func (e *Executor) setBoostCache(sqlResult *sqltypes.Result, cacheKey string) {
+	encodedResults, _ := e.encodeResults(sqlResult)
+	e.boostCache.Set(cacheKey, encodedResults)
+}
+
+func (e *Executor) fetchFromRedis(cacheKey string) (bool, *sqltypes.Result) {
+	redisResults, err := e.boostCache.Get(cacheKey)
+	var cacheHit bool
+
+	var decodeErr error
+	var decodedResults *sqltypes.Result
+
+	if redisResults == "" || err != nil {
+		cacheHit = false
+	} else {
+		decodedResults, decodeErr = e.decodeResults(redisResults)
+
+		if decodeErr != nil {
+			fmt.Printf("Failed to decode: %v\n", decodeErr)
+			cacheHit = false
+		}
+
+		cacheHit = true
+	}
+	return cacheHit, decodedResults
+}
+
+func (e *Executor) encodeResults(result *sqltypes.Result) (string, error) {
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		fmt.Printf("Failed to encode: %v\n", err)
+		return "", err
+	}
+
+	jsonString := string(jsonData)
+
+	return jsonString, nil
+}
+
+func (e *Executor) decodeResults(redisResults string) (*sqltypes.Result, error) {
+	var result sqltypes.Result
+	err := json.Unmarshal([]byte(redisResults), &result)
+	if err != nil {
+		fmt.Printf("Failed to decode: %v\n", err)
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+func getCacheKey(config *boost.PlanConfig, vars map[string]*querypb.BindVariable) string {
 	return redis.GenerateCacheKey(cacheKeyParams(config, vars)...)
 }
 
