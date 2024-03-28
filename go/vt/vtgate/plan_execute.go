@@ -132,7 +132,7 @@ func (e *Executor) newExecute(ctx context.Context, safeSession *SafeSession, sql
 			return sqlparser.StmtSelect, decodedResults, nil
 		} else {
 			stmt, sqlResult, err1 := e.executePlan(ctx, plan, vcursor, bindVars, execStart)(logStats, safeSession)
-			go e.setBoostCache(sqlResult, cacheKey)
+			defer e.setBoostCache(sqlResult, cacheKey)
 
 			return stmt, sqlResult, err1
 		}
