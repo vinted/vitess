@@ -18,6 +18,7 @@ limitations under the License.
 package sqltypes
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -47,6 +48,8 @@ var (
 
 	// ErrIncompatibleTypeCast indicates a casting problem
 	ErrIncompatibleTypeCast = errors.New("Cannot convert value to desired type")
+
+	varcharBytes = []byte{'"', 'V', 'A', 'R', 'C', 'H', 'A', 'R', ':'}
 )
 
 // BinWriter interface is used for encoding values.
@@ -405,6 +408,8 @@ func (v Value) IsDateTime() bool {
 // It's not a complete implementation.
 func (v Value) MarshalJSON() ([]byte, error) {
 	switch {
+	case v.typ == VarChar:
+		return json.Marshal(string(append(varcharBytes[1:], v.val...)))
 	case v.IsQuoted() || v.typ == Bit:
 		return json.Marshal(v.ToString())
 	case v.typ == Null:
@@ -427,6 +432,11 @@ func (v *Value) UnmarshalJSON(b []byte) error {
 		err = json.Unmarshal(b, &ival)
 		val = ival
 	case '"':
+		if len(b) > 8 && bytes.Equal(b[0:len(varcharBytes)], varcharBytes) {
+			val = string(b[len(varcharBytes) : len(b)-1])
+			break
+		}
+
 		var bval []byte
 		err = json.Unmarshal(b, &bval)
 		val = bval
