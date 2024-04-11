@@ -164,7 +164,7 @@ type TabletRecorder interface {
 type keyspaceShardTabletType string
 type tabletAliasString string
 
-//HealthCheck declares what the TabletGateway needs from the HealthCheck
+// HealthCheck declares what the TabletGateway needs from the HealthCheck
 type HealthCheck interface {
 	// CacheStatus returns a displayable version of the health check cache.
 	CacheStatus() TabletsCacheStatusList
@@ -245,18 +245,27 @@ type HealthCheckImpl struct {
 // NewHealthCheck creates a new HealthCheck object.
 // Parameters:
 // retryDelay.
-//   The duration to wait before retrying to connect (e.g. after a failed connection
-//   attempt).
+//
+//	The duration to wait before retrying to connect (e.g. after a failed connection
+//	attempt).
+//
 // healthCheckTimeout.
-//   The duration for which we consider a health check response to be 'fresh'. If we don't get
-//   a health check response from a tablet for more than this duration, we consider the tablet
-//   not healthy.
+//
+//	The duration for which we consider a health check response to be 'fresh'. If we don't get
+//	a health check response from a tablet for more than this duration, we consider the tablet
+//	not healthy.
+//
 // topoServer.
-//   The topology server that this healthcheck object can use to retrieve cell or tablet information
+//
+//	The topology server that this healthcheck object can use to retrieve cell or tablet information
+//
 // localCell.
-//   The localCell for this healthcheck
+//
+//	The localCell for this healthcheck
+//
 // callback.
-//   A function to call when there is a master change. Used to notify vtgate's buffer to stop buffering.
+//
+//	A function to call when there is a master change. Used to notify vtgate's buffer to stop buffering.
 func NewHealthCheck(ctx context.Context, retryDelay, healthCheckTimeout time.Duration, topoServer *topo.Server, localCell, cellsToWatch string) *HealthCheckImpl {
 	log.Infof("loading tablets for cells: %v", cellsToWatch)
 
