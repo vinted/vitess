@@ -314,7 +314,7 @@ func (dr *switcherDryRun) dropSourceBlacklistedTables(ctx context.Context) error
 		logs = append(logs, fmt.Sprintf("\tKeyspace %s Shard %s Tablet %d", si.Keyspace(), si.ShardName(), si.MasterAlias.Uid))
 	}
 	if len(logs) > 0 {
-		dr.drLog.Log(fmt.Sprintf("Denied tables [%s] will be removed from:", strings.Join(dr.ts.Tables(), ",")))
+		dr.drLog.Log(fmt.Sprintf("Blacklisted tables [%s] will be removed from:", strings.Join(dr.ts.Tables(), ",")))
 		dr.drLog.LogSlice(logs)
 	}
 	return nil
