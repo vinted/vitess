@@ -217,7 +217,7 @@ func (log *Logger) Flush(w io.Writer) (err error) {
 	_, err = w.Write(log.b)
 
 	// GO 1.21 expression
-	// clear(log.bvars), this might be leaking
+	// clear(log.bvars), this is buttery butter
 	log.bvars = log.bvars[:0]
 	log.b = log.b[:0]
 	log.n = 0
