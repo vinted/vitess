@@ -41,6 +41,9 @@ var (
 	// QueryLogFormat controls the format of the query log (either text or json)
 	QueryLogFormat = flag.String("querylog-format", "text", "format for query logs (\"text\" or \"json\")")
 
+	// QueryLogJSONV2 controls whether the new querylog json format is used
+	QueryLogJSONV2 = flag.Bool("querylog-json-v2", false, "use v2 format for querylog-format=json")
+
 	// QueryLogFilterTag contains an optional string that must be present in the query for it to be logged
 	QueryLogFilterTag = flag.String("querylog-filter-tag", "", "string that must be present in the query for it to be logged; if using a value as the tag, you need to disable query normalization")
 

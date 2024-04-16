@@ -129,6 +129,7 @@ func (stats *LogStats) Logf(w io.Writer, params url.Values) error {
 	}
 
 	redacted := *streamlog.RedactDebugUIQueries
+	jsonV2 := *streamlog.QueryLogJSONV2
 	_, fullBindParams := params["full"]
 	remoteAddr, username := stats.RemoteAddrUsername()
 
@@ -163,6 +164,8 @@ func (stats *LogStats) Logf(w io.Writer, params url.Values) error {
 	log.Key("BindVars")
 	if redacted {
 		log.Redacted()
+	} else if jsonV2 {
+		log.BindVariablesV2(stats.BindVariables, fullBindParams)
 	} else {
 		log.BindVariables(stats.BindVariables, fullBindParams)
 	}
