@@ -17,6 +17,7 @@ limitations under the License.
 package logstats
 
 import (
+	"encoding/base64"
 	"io"
 	"sort"
 	"strconv"
@@ -28,24 +29,6 @@ import (
 	"vitess.io/vitess/go/sqltypes"
 	querypb "vitess.io/vitess/go/vt/proto/query"
 )
-
-type CommonLogger interface {
-	Init(json bool)
-	Redacted()
-	Key(key string)
-	StringUnquoted(value string)
-	TabTerminated()
-	String(value string)
-	StringSingleQuoted(value string)
-	Time(t time.Time)
-	Duration(t time.Duration)
-	BindVariables(bvars map[string]*querypb.BindVariable, full bool)
-	Int(i int64)
-	Uint(u uint64)
-	Bool(b bool)
-	Strings(strs []string)
-	Flush(w io.Writer) error
-}
 
 type logbv struct {
 	Name string
@@ -97,6 +80,43 @@ func (log *Logger) appendBVarsJSON(b []byte, bvars map[string]*querypb.BindVaria
 		} else {
 			if full {
 				b = strconv.AppendQuote(b, hack.String(bv.BVar.Value))
+			} else {
+				b = append(b, '"')
+				b = strconv.AppendInt(b, int64(len(bv.BVar.Values)), 10)
+				b = append(b, ` bytes"`...)
+			}
+		}
+		b = append(b, '}')
+	}
+	return append(b, '}')
+}
+
+// appendBVarsJSONV2 is a new version of appendBVarsJSON that uses base64 encoding
+func (log *Logger) appendBVarsJSONV2(b []byte, bvars map[string]*querypb.BindVariable, full bool) []byte {
+	log.bvars = sortBVars(log.bvars[:0], bvars)
+
+	b = append(b, '{')
+	for i, bv := range log.bvars {
+		if i > 0 {
+			b = append(b, ',', ' ')
+		}
+		b = strconv.AppendQuote(b, bv.Name)
+		b = append(b, `: {"type": `...)
+		b = strconv.AppendQuote(b, querypb.Type_name[int32(bv.BVar.Type)])
+		b = append(b, `, "value": `...)
+
+		if sqltypes.IsIntegral(bv.BVar.Type) || sqltypes.IsFloat(bv.BVar.Type) {
+			b = append(b, bv.BVar.Value...)
+
+		} else if bv.BVar.Type == sqltypes.Tuple {
+			b = append(b, '"')
+			b = strconv.AppendInt(b, int64(len(bv.BVar.Values)), 10)
+			b = append(b, ` items"`...)
+		} else {
+			if full {
+				buf := make([]byte, base64.StdEncoding.EncodedLen(len(bv.BVar.Value)))
+				base64.StdEncoding.Encode(buf, bv.BVar.Value)
+				b = strconv.AppendQuote(b, hack.String(buf))
 			} else {
 				b = append(b, '"')
 				b = strconv.AppendInt(b, int64(len(bv.BVar.Values)), 10)
@@ -184,6 +204,14 @@ func (log *Logger) BindVariables(bvars map[string]*querypb.BindVariable, full bo
 	// printing syntax, which was simply `fmt.Sprintf("%v")`, is not stable or
 	// safe to parse
 	log.b = log.appendBVarsJSON(log.b, bvars, full)
+}
+
+// BindVariablesV2 is a new version of BindVariables that uses base64 encoding
+func (log *Logger) BindVariablesV2(bvars map[string]*querypb.BindVariable, full bool) {
+	// the bind variables are printed as JSON in text mode because the original
+	// printing syntax, which was simply `fmt.Sprintf("%v")`, is not stable or
+	// safe to parse
+	log.b = log.appendBVarsJSONV2(log.b, bvars, full)
 }
 
 func (log *Logger) Int(i int64) {
