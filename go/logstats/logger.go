@@ -66,9 +66,9 @@ func (log *Logger) appendBVarsJSON(b []byte, bvars map[string]*querypb.BindVaria
 			b = append(b, ',', ' ')
 		}
 		b = strconv.AppendQuote(b, bv.Name)
-		b = append(b, `: {"type": `...)
+		b = append(b, `: {"Type": `...)
 		b = strconv.AppendQuote(b, querypb.Type_name[int32(bv.BVar.Type)])
-		b = append(b, `, "value": `...)
+		b = append(b, `, "Value": `...)
 
 		if sqltypes.IsIntegral(bv.BVar.Type) || sqltypes.IsFloat(bv.BVar.Type) {
 			b = append(b, bv.BVar.Value...)
@@ -101,9 +101,9 @@ func (log *Logger) appendBVarsJSONV2(b []byte, bvars map[string]*querypb.BindVar
 			b = append(b, ',', ' ')
 		}
 		b = strconv.AppendQuote(b, bv.Name)
-		b = append(b, `: {"type": `...)
+		b = append(b, `: {"Type": `...)
 		b = strconv.AppendQuote(b, querypb.Type_name[int32(bv.BVar.Type)])
-		b = append(b, `, "value": `...)
+		b = append(b, `, "Value": `...)
 
 		if sqltypes.IsIntegral(bv.BVar.Type) || sqltypes.IsFloat(bv.BVar.Type) {
 			b = append(b, bv.BVar.Value...)

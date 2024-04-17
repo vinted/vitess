@@ -78,7 +78,7 @@ func TestLogStatsFormat(t *testing.T) {
 		{ // 0
 			redact:   false,
 			format:   "text",
-			expected: "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1\"\t{\"intVal\": {\"type\": \"INT64\", \"value\": 1}}\t0\t0\t\"\"\t\"MASTER\"\t\"suuid\"\tfalse\t\"ks1.tbl1,ks2.tbl2\"\t\"db\"\n",
+			expected: "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1\"\t{\"intVal\": {\"Type\": \"INT64\", \"Value\": 1}}\t0\t0\t\"\"\t\"MASTER\"\t\"suuid\"\tfalse\t\"ks1.tbl1,ks2.tbl2\"\t\"db\"\n",
 			bindVars: intBindVar,
 		}, { // 1
 			redact:   true,
@@ -88,7 +88,7 @@ func TestLogStatsFormat(t *testing.T) {
 		}, { // 2
 			redact:   false,
 			format:   "json",
-			expected: "{\"BindVars\":{\"intVal\":{\"type\":\"INT64\",\"value\":1}},\"CommitTime\":0,\"Effective Caller\":\"\",\"End\":\"2017-01-01 01:02:04.000001\",\"Error\":\"\",\"ExecuteTime\":0,\"ImmediateCaller\":\"\",\"InTransaction\":false,\"Keyspace\":\"db\",\"Method\":\"test\",\"PlanTime\":0,\"RemoteAddr\":\"\",\"RowsAffected\":0,\"SQL\":\"sql1\",\"SessionUUID\":\"suuid\",\"ShardQueries\":0,\"Start\":\"2017-01-01 01:02:03.000000\",\"StmtType\":\"\",\"Table\":\"ks1.tbl1,ks2.tbl2\",\"TabletType\":\"MASTER\",\"TotalTime\":1.000001,\"Username\":\"\"}",
+			expected: "{\"BindVars\":{\"intVal\":{\"Type\":\"INT64\",\"Value\":1}},\"CommitTime\":0,\"Effective Caller\":\"\",\"End\":\"2017-01-01 01:02:04.000001\",\"Error\":\"\",\"ExecuteTime\":0,\"ImmediateCaller\":\"\",\"InTransaction\":false,\"Keyspace\":\"db\",\"Method\":\"test\",\"PlanTime\":0,\"RemoteAddr\":\"\",\"RowsAffected\":0,\"SQL\":\"sql1\",\"SessionUUID\":\"suuid\",\"ShardQueries\":0,\"Start\":\"2017-01-01 01:02:03.000000\",\"StmtType\":\"\",\"Table\":\"ks1.tbl1,ks2.tbl2\",\"TabletType\":\"MASTER\",\"TotalTime\":1.000001,\"Username\":\"\"}",
 			bindVars: intBindVar,
 		}, { // 3
 			redact:   true,
@@ -98,7 +98,7 @@ func TestLogStatsFormat(t *testing.T) {
 		}, { // 4
 			redact:   false,
 			format:   "text",
-			expected: "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1\"\t{\"strVal\": {\"type\": \"VARBINARY\", \"value\": \"abc\"}}\t0\t0\t\"\"\t\"MASTER\"\t\"suuid\"\tfalse\t\"ks1.tbl1,ks2.tbl2\"\t\"db\"\n",
+			expected: "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1\"\t{\"strVal\": {\"Type\": \"VARBINARY\", \"Value\": \"abc\"}}\t0\t0\t\"\"\t\"MASTER\"\t\"suuid\"\tfalse\t\"ks1.tbl1,ks2.tbl2\"\t\"db\"\n",
 			bindVars: stringBindVar,
 		}, { // 5
 			redact:   true,
@@ -108,7 +108,7 @@ func TestLogStatsFormat(t *testing.T) {
 		}, { // 6
 			redact:   false,
 			format:   "json",
-			expected: "{\"BindVars\":{\"strVal\":{\"type\":\"VARBINARY\",\"value\":\"abc\"}},\"CommitTime\":0,\"Effective Caller\":\"\",\"End\":\"2017-01-01 01:02:04.000001\",\"Error\":\"\",\"ExecuteTime\":0,\"ImmediateCaller\":\"\",\"InTransaction\":false,\"Keyspace\":\"db\",\"Method\":\"test\",\"PlanTime\":0,\"RemoteAddr\":\"\",\"RowsAffected\":0,\"SQL\":\"sql1\",\"SessionUUID\":\"suuid\",\"ShardQueries\":0,\"Start\":\"2017-01-01 01:02:03.000000\",\"StmtType\":\"\",\"Table\":\"ks1.tbl1,ks2.tbl2\",\"TabletType\":\"MASTER\",\"TotalTime\":1.000001,\"Username\":\"\"}",
+			expected: "{\"BindVars\":{\"strVal\":{\"Type\":\"VARBINARY\",\"Value\":\"abc\"}},\"CommitTime\":0,\"Effective Caller\":\"\",\"End\":\"2017-01-01 01:02:04.000001\",\"Error\":\"\",\"ExecuteTime\":0,\"ImmediateCaller\":\"\",\"InTransaction\":false,\"Keyspace\":\"db\",\"Method\":\"test\",\"PlanTime\":0,\"RemoteAddr\":\"\",\"RowsAffected\":0,\"SQL\":\"sql1\",\"SessionUUID\":\"suuid\",\"ShardQueries\":0,\"Start\":\"2017-01-01 01:02:03.000000\",\"StmtType\":\"\",\"Table\":\"ks1.tbl1,ks2.tbl2\",\"TabletType\":\"MASTER\",\"TotalTime\":1.000001,\"Username\":\"\"}",
 			bindVars: stringBindVar,
 		}, { // 7
 			redact:   true,
@@ -155,12 +155,12 @@ func TestLogStatsFilter(t *testing.T) {
 	params := map[string][]string{"full": {}}
 
 	got := testFormat(t, logStats, params)
-	want := "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1 /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"type\": \"INT64\", \"value\": 1}}\t0\t0\t\"\"\t\"\"\t\"\"\tfalse\t\"\"\t\"\"\n"
+	want := "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1 /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"Type\": \"INT64\", \"Value\": 1}}\t0\t0\t\"\"\t\"\"\t\"\"\tfalse\t\"\"\t\"\"\n"
 	assert.Equal(t, want, got)
 
 	*streamlog.QueryLogFilterTag = "LOG_THIS_QUERY"
 	got = testFormat(t, logStats, params)
-	want = "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1 /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"type\": \"INT64\", \"value\": 1}}\t0\t0\t\"\"\t\"\"\t\"\"\tfalse\t\"\"\t\"\"\n"
+	want = "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1 /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"Type\": \"INT64\", \"Value\": 1}}\t0\t0\t\"\"\t\"\"\t\"\"\tfalse\t\"\"\t\"\"\n"
 	assert.Equal(t, want, got)
 
 	*streamlog.QueryLogFilterTag = "NOT_THIS_QUERY"
@@ -178,12 +178,12 @@ func TestLogStatsRowThreshold(t *testing.T) {
 	params := map[string][]string{"full": {}}
 
 	got := testFormat(t, logStats, params)
-	want := "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1 /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"type\": \"INT64\", \"value\": 1}}\t0\t0\t\"\"\t\"\"\t\"\"\tfalse\t\"\"\t\"\"\n"
+	want := "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1 /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"Type\": \"INT64\", \"Value\": 1}}\t0\t0\t\"\"\t\"\"\t\"\"\tfalse\t\"\"\t\"\"\n"
 	assert.Equal(t, want, got)
 
 	*streamlog.QueryLogRowThreshold = 0
 	got = testFormat(t, logStats, params)
-	want = "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1 /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"type\": \"INT64\", \"value\": 1}}\t0\t0\t\"\"\t\"\"\t\"\"\tfalse\t\"\"\t\"\"\n"
+	want = "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t0.000000\t0.000000\t0.000000\t\t\"sql1 /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"Type\": \"INT64\", \"Value\": 1}}\t0\t0\t\"\"\t\"\"\t\"\"\tfalse\t\"\"\t\"\"\n"
 	assert.Equal(t, want, got)
 	*streamlog.QueryLogRowThreshold = 1
 	got = testFormat(t, logStats, params)
@@ -257,9 +257,9 @@ func TestLogStatsFormatJSONV2(t *testing.T) {
 		bindVar  *querypb.BindVariable
 		expected string
 	}{
-		{
-			&querypb.BindVariable{Type: querypb.Type_BINARY, Value: []byte("abc")},
-			"YWJj",
+		{ // {"Type": "BINARY", "Value": "\x16k@\xb4J\xbaK\xd6"} breaks JSON, so we base64 endcode the value
+			&querypb.BindVariable{Type: querypb.Type_BINARY, Value: []byte("\x16k@\xb4J\xbaK\xd6")},
+			"FmtAtEq6S9Y=",
 		}, {
 			&querypb.BindVariable{Type: querypb.Type_BIT, Value: []byte("134")},
 			"MTM0",
@@ -305,8 +305,9 @@ func TestLogStatsFormatJSONV2(t *testing.T) {
 			err := json.Unmarshal([]byte(got), &parsed)
 			assert.NoError(t, err)
 			assert.NotNil(t, parsed)
-			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["value"]
-
+			bindType := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Type"].(string)
+			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Value"]
+			assert.Equal(t, test.bindVar.Type.String(), bindType)
 			assert.Equal(t, test.expected, bindVal)
 		})
 	}
@@ -363,8 +364,9 @@ func TestLogStatsFormatJSONV2(t *testing.T) {
 			err := json.Unmarshal([]byte(got), &parsed)
 			assert.NoError(t, err)
 			assert.NotNil(t, parsed)
-			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["value"]
-
+			bindType := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Type"].(string)
+			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Value"]
+			assert.Equal(t, test.bindVar.Type.String(), bindType)
 			assert.Equal(t, test.expected, bindVal)
 		})
 	}
@@ -415,8 +417,9 @@ func TestLogStatsFormatJSONV2(t *testing.T) {
 			err := json.Unmarshal([]byte(got), &parsed)
 			assert.NoError(t, err)
 			assert.NotNil(t, parsed)
-			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["value"]
-
+			bindType := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Type"].(string)
+			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Value"]
+			assert.Equal(t, test.bindVar.Type.String(), bindType)
 			assert.Equal(t, test.expected, bindVal)
 		})
 	}
