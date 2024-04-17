@@ -76,7 +76,7 @@ func TestLogStatsFormat(t *testing.T) {
 	*streamlog.RedactDebugUIQueries = false
 	*streamlog.QueryLogFormat = "text"
 	got := testFormat(logStats, url.Values(params))
-	want := "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t\t\"sql\"\t{\"intVal\": {\"type\": \"INT64\", \"value\": 1}}\t1\t\"sql with pii\"\tmysql\t0.000000\t0.000000\t0\t12345\t1\t\"\"\t\n"
+	want := "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t\t\"sql\"\t{\"intVal\": {\"Type\": \"INT64\", \"Value\": 1}}\t1\t\"sql with pii\"\tmysql\t0.000000\t0.000000\t0\t12345\t1\t\"\"\t\n"
 	if got != want {
 		t.Errorf("logstats format: got:\n%q\nwant:\n%q\n", got, want)
 	}
@@ -101,7 +101,7 @@ func TestLogStatsFormat(t *testing.T) {
 	if err != nil {
 		t.Errorf("logstats format: error marshaling json: %v -- got:\n%v", err, got)
 	}
-	want = "{\n    \"BindVars\": {\n        \"intVal\": {\n            \"type\": \"INT64\",\n            \"value\": 1\n        }\n    },\n    \"CallInfo\": \"\",\n    \"ConnWaitTime\": 0,\n    \"Effective Caller\": \"\",\n    \"End\": \"2017-01-01 01:02:04.000001\",\n    \"Error\": \"\",\n    \"ImmediateCaller\": \"\",\n    \"Method\": \"test\",\n    \"MysqlTime\": 0,\n    \"OriginalSQL\": \"sql\",\n    \"PlanType\": \"\",\n    \"Queries\": 1,\n    \"QuerySources\": \"mysql\",\n    \"ResponseSize\": 1,\n    \"RewrittenSQL\": \"sql with pii\",\n    \"RowsAffected\": 0,\n    \"Start\": \"2017-01-01 01:02:03.000000\",\n    \"TotalTime\": 1.000001,\n    \"TransactionID\": 12345,\n    \"Username\": \"\"\n}"
+	want = "{\n    \"BindVars\": {\n        \"intVal\": {\n            \"Type\": \"INT64\",\n            \"Value\": 1\n        }\n    },\n    \"CallInfo\": \"\",\n    \"ConnWaitTime\": 0,\n    \"Effective Caller\": \"\",\n    \"End\": \"2017-01-01 01:02:04.000001\",\n    \"Error\": \"\",\n    \"ImmediateCaller\": \"\",\n    \"Method\": \"test\",\n    \"MysqlTime\": 0,\n    \"OriginalSQL\": \"sql\",\n    \"PlanType\": \"\",\n    \"Queries\": 1,\n    \"QuerySources\": \"mysql\",\n    \"ResponseSize\": 1,\n    \"RewrittenSQL\": \"sql with pii\",\n    \"RowsAffected\": 0,\n    \"Start\": \"2017-01-01 01:02:03.000000\",\n    \"TotalTime\": 1.000001,\n    \"TransactionID\": 12345,\n    \"Username\": \"\"\n}"
 	if string(formatted) != want {
 		t.Errorf("logstats format: got:\n%q\nwant:\n%v\n", string(formatted), want)
 	}
@@ -130,7 +130,7 @@ func TestLogStatsFormat(t *testing.T) {
 
 	*streamlog.QueryLogFormat = "text"
 	got = testFormat(logStats, url.Values(params))
-	want = "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t\t\"sql\"\t{\"strVal\": {\"type\": \"VARBINARY\", \"value\": \"abc\"}}\t1\t\"sql with pii\"\tmysql\t0.000000\t0.000000\t0\t12345\t1\t\"\"\t\n"
+	want = "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t\t\"sql\"\t{\"strVal\": {\"Type\": \"VARBINARY\", \"Value\": \"abc\"}}\t1\t\"sql with pii\"\tmysql\t0.000000\t0.000000\t0\t12345\t1\t\"\"\t\n"
 	if got != want {
 		t.Errorf("logstats format: got:\n%q\nwant:\n%q\n", got, want)
 	}
@@ -145,7 +145,7 @@ func TestLogStatsFormat(t *testing.T) {
 	if err != nil {
 		t.Errorf("logstats format: error marshaling json: %v -- got:\n%v", err, got)
 	}
-	want = "{\n    \"BindVars\": {\n        \"strVal\": {\n            \"type\": \"VARBINARY\",\n            \"value\": \"abc\"\n        }\n    },\n    \"CallInfo\": \"\",\n    \"ConnWaitTime\": 0,\n    \"Effective Caller\": \"\",\n    \"End\": \"2017-01-01 01:02:04.000001\",\n    \"Error\": \"\",\n    \"ImmediateCaller\": \"\",\n    \"Method\": \"test\",\n    \"MysqlTime\": 0,\n    \"OriginalSQL\": \"sql\",\n    \"PlanType\": \"\",\n    \"Queries\": 1,\n    \"QuerySources\": \"mysql\",\n    \"ResponseSize\": 1,\n    \"RewrittenSQL\": \"sql with pii\",\n    \"RowsAffected\": 0,\n    \"Start\": \"2017-01-01 01:02:03.000000\",\n    \"TotalTime\": 1.000001,\n    \"TransactionID\": 12345,\n    \"Username\": \"\"\n}"
+	want = "{\n    \"BindVars\": {\n        \"strVal\": {\n            \"Type\": \"VARBINARY\",\n            \"Value\": \"abc\"\n        }\n    },\n    \"CallInfo\": \"\",\n    \"ConnWaitTime\": 0,\n    \"Effective Caller\": \"\",\n    \"End\": \"2017-01-01 01:02:04.000001\",\n    \"Error\": \"\",\n    \"ImmediateCaller\": \"\",\n    \"Method\": \"test\",\n    \"MysqlTime\": 0,\n    \"OriginalSQL\": \"sql\",\n    \"PlanType\": \"\",\n    \"Queries\": 1,\n    \"QuerySources\": \"mysql\",\n    \"ResponseSize\": 1,\n    \"RewrittenSQL\": \"sql with pii\",\n    \"RowsAffected\": 0,\n    \"Start\": \"2017-01-01 01:02:03.000000\",\n    \"TotalTime\": 1.000001,\n    \"TransactionID\": 12345,\n    \"Username\": \"\"\n}"
 	if string(formatted) != want {
 		t.Errorf("logstats format: got:\n%q\nwant:\n%v\n", string(formatted), want)
 	}
@@ -167,14 +167,14 @@ func TestLogStatsFilter(t *testing.T) {
 	params := map[string][]string{"full": {}}
 
 	got := testFormat(logStats, url.Values(params))
-	want := "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t\t\"sql /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"type\": \"INT64\", \"value\": 1}}\t1\t\"sql with pii\"\tmysql\t0.000000\t0.000000\t0\t0\t1\t\"\"\t\n"
+	want := "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t\t\"sql /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"Type\": \"INT64\", \"Value\": 1}}\t1\t\"sql with pii\"\tmysql\t0.000000\t0.000000\t0\t0\t1\t\"\"\t\n"
 	if got != want {
 		t.Errorf("logstats format: got:\n%q\nwant:\n%q\n", got, want)
 	}
 
 	*streamlog.QueryLogFilterTag = "LOG_THIS_QUERY"
 	got = testFormat(logStats, url.Values(params))
-	want = "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t\t\"sql /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"type\": \"INT64\", \"value\": 1}}\t1\t\"sql with pii\"\tmysql\t0.000000\t0.000000\t0\t0\t1\t\"\"\t\n"
+	want = "test\t\t\t''\t''\t2017-01-01 01:02:03.000000\t2017-01-01 01:02:04.000001\t1.000001\t\t\"sql /* LOG_THIS_QUERY */\"\t{\"intVal\": {\"Type\": \"INT64\", \"Value\": 1}}\t1\t\"sql with pii\"\tmysql\t0.000000\t0.000000\t0\t0\t1\t\"\"\t\n"
 	if got != want {
 		t.Errorf("logstats format: got:\n%q\nwant:\n%q\n", got, want)
 	}
@@ -274,9 +274,9 @@ func TestLogStatsFormatJSONV2(t *testing.T) {
 		bindVar  *querypb.BindVariable
 		expected string
 	}{
-		{
-			&querypb.BindVariable{Type: querypb.Type_BINARY, Value: []byte("abc")},
-			"YWJj",
+		{ // {"Type": "BINARY", "Value": "\x16k@\xb4J\xbaK\xd6"} breaks JSON, so we base64 endcode the value
+			&querypb.BindVariable{Type: querypb.Type_BINARY, Value: []byte("\x16k@\xb4J\xbaK\xd6")},
+			"FmtAtEq6S9Y=",
 		}, {
 			&querypb.BindVariable{Type: querypb.Type_BIT, Value: []byte("134")},
 			"MTM0",
@@ -316,14 +316,15 @@ func TestLogStatsFormatJSONV2(t *testing.T) {
 	for i, test := range testsEncoded {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			logStats.BindVariables["vtg"] = test.bindVar
-			got := testFormat(logStats, url.Values(params))
+			got := testFormat(logStats, params)
 			t.Logf("got: %s", got)
 			var parsed map[string]interface{}
 			err := json.Unmarshal([]byte(got), &parsed)
 			assert.NoError(t, err)
 			assert.NotNil(t, parsed)
-			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["value"]
-
+			bindType := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Type"].(string)
+			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Value"]
+			assert.Equal(t, test.bindVar.Type.String(), bindType)
 			assert.Equal(t, test.expected, bindVal)
 		})
 	}
@@ -374,14 +375,15 @@ func TestLogStatsFormatJSONV2(t *testing.T) {
 	for i, test := range testsUnchanged {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			logStats.BindVariables["vtg"] = test.bindVar
-			got := testFormat(logStats, url.Values(params))
+			got := testFormat(logStats, params)
 			t.Logf("got: %s", got)
 			var parsed map[string]interface{}
 			err := json.Unmarshal([]byte(got), &parsed)
 			assert.NoError(t, err)
 			assert.NotNil(t, parsed)
-			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["value"]
-
+			bindType := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Type"].(string)
+			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Value"]
+			assert.Equal(t, test.bindVar.Type.String(), bindType)
 			assert.Equal(t, test.expected, bindVal)
 		})
 	}
@@ -426,14 +428,15 @@ func TestLogStatsFormatJSONV2(t *testing.T) {
 	for i, test := range testsUnchangedTuples {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			logStats.BindVariables["vtg"] = test.bindVar
-			got := testFormat(logStats, url.Values(params))
+			got := testFormat(logStats, params)
 			t.Logf("got: %s", got)
 			var parsed map[string]interface{}
 			err := json.Unmarshal([]byte(got), &parsed)
 			assert.NoError(t, err)
 			assert.NotNil(t, parsed)
-			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["value"]
-
+			bindType := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Type"].(string)
+			bindVal := parsed["BindVars"].(map[string]interface{})["vtg"].(map[string]interface{})["Value"]
+			assert.Equal(t, test.bindVar.Type.String(), bindType)
 			assert.Equal(t, test.expected, bindVal)
 		})
 	}
