@@ -107,8 +107,8 @@ func TestStatusHtml(t *testing.T) {
 			done:     make(chan struct{}),
 		},
 	}
-	testStats.controllers[1].sourceTablet.Set("src1")
-	testStats.controllers[2].sourceTablet.Set("src2")
+	testStats.controllers[1].sourceTablet.Set("zone1-01")
+	testStats.controllers[2].sourceTablet.Set("zone1-02")
 	close(testStats.controllers[2].done)
 
 	tpl := template.Must(template.New("test").Parse(vreplicationTemplate))
@@ -135,7 +135,7 @@ func TestVReplicationStats(t *testing.T) {
 			done:     make(chan struct{}),
 		},
 	}
-	testStats.controllers[1].sourceTablet.Set("src1")
+	testStats.controllers[1].sourceTablet.Set("zone1-01")
 
 	sleepTime := 1 * time.Millisecond
 	record := func(phase string) {

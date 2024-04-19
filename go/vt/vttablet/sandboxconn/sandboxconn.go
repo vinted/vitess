@@ -413,9 +413,9 @@ func (sbc *SandboxConn) MessageAck(ctx context.Context, target *querypb.Target, 
 // SandboxSQRowCount is the default number of fake splits returned.
 var SandboxSQRowCount = int64(10)
 
-// StreamHealth is not implemented.
+// StreamHealth always mocks a "healthy" result.
 func (sbc *SandboxConn) StreamHealth(ctx context.Context, callback func(*querypb.StreamHealthResponse) error) error {
-	return fmt.Errorf("not implemented in test")
+	return nil
 }
 
 // ExpectVStreamStartPos makes the conn verify that that the next vstream request has the right startPos.
@@ -512,7 +512,7 @@ func (sbc *SandboxConn) QueryServiceByAlias(_ *topodatapb.TabletAlias, _ *queryp
 func (sbc *SandboxConn) HandlePanic(err *error) {
 }
 
-//ReserveBeginExecute implements the QueryService interface
+// ReserveBeginExecute implements the QueryService interface
 func (sbc *SandboxConn) ReserveBeginExecute(ctx context.Context, target *querypb.Target, preQueries []string, sql string, bindVariables map[string]*querypb.BindVariable, options *querypb.ExecuteOptions) (*sqltypes.Result, int64, int64, *topodatapb.TabletAlias, error) {
 	reservedID := sbc.reserve(ctx, target, preQueries, bindVariables, 0, options)
 	result, transactionID, alias, err := sbc.BeginExecute(ctx, target, nil, sql, bindVariables, reservedID, options)
@@ -525,7 +525,7 @@ func (sbc *SandboxConn) ReserveBeginExecute(ctx context.Context, target *querypb
 	return result, transactionID, reservedID, alias, nil
 }
 
-//ReserveExecute implements the QueryService interface
+// ReserveExecute implements the QueryService interface
 func (sbc *SandboxConn) ReserveExecute(ctx context.Context, target *querypb.Target, preQueries []string, sql string, bindVariables map[string]*querypb.BindVariable, transactionID int64, options *querypb.ExecuteOptions) (*sqltypes.Result, int64, *topodatapb.TabletAlias, error) {
 	reservedID := sbc.reserve(ctx, target, preQueries, bindVariables, transactionID, options)
 	result, err := sbc.Execute(ctx, target, sql, bindVariables, transactionID, reservedID, options)
@@ -549,7 +549,7 @@ func (sbc *SandboxConn) reserve(ctx context.Context, target *querypb.Target, pre
 	return sbc.ReserveID.Add(1)
 }
 
-//Release implements the QueryService interface
+// Release implements the QueryService interface
 func (sbc *SandboxConn) Release(ctx context.Context, target *querypb.Target, transactionID, reservedID int64) error {
 	sbc.ReleaseCount.Add(1)
 	return sbc.getError()
@@ -615,7 +615,7 @@ func (sbc *SandboxConn) getTxReservedID(txID int64) int64 {
 	return sbc.txIDToRID[txID]
 }
 
-//StringQueries returns the queries executed as a slice of strings
+// StringQueries returns the queries executed as a slice of strings
 func (sbc *SandboxConn) StringQueries() []string {
 	result := make([]string, len(sbc.Queries))
 	for i, query := range sbc.Queries {

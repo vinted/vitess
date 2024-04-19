@@ -18,9 +18,12 @@ package wrangler
 
 import (
 	"fmt"
+	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
+	"vitess.io/vitess/go/vt/grpcclient"
 	"vitess.io/vitess/go/vt/log"
 
 	"vitess.io/vitess/go/mysql/fakesqldb"
@@ -39,6 +42,8 @@ import (
 	"vitess.io/vitess/go/vt/topo"
 	"vitess.io/vitess/go/vt/topo/memorytopo"
 	"vitess.io/vitess/go/vt/topotools"
+	"vitess.io/vitess/go/vt/vttablet/queryservice"
+	"vitess.io/vitess/go/vt/vttablet/tabletconn"
 	"vitess.io/vitess/go/vt/vttablet/tabletmanager/vreplication"
 	"vitess.io/vitess/go/vt/vttablet/tmclient"
 )
@@ -61,6 +66,7 @@ type testMigraterEnv struct {
 	sourceKeyRanges []*topodatapb.KeyRange
 	targetKeyRanges []*topodatapb.KeyRange
 	tmeDB           *fakesqldb.DB
+	mu              sync.Mutex
 }
 
 // testShardMigraterEnv has some convenience functions for adding expected queries.
@@ -121,6 +127,19 @@ func newTestTableMigraterCustom(ctx context.Context, t *testing.T, sourceShards,
 		}
 		tme.targetKeyRanges = append(tme.targetKeyRanges, targetKeyRange)
 	}
+
+	dialerName := fmt.Sprintf("TrafficSwitcherTest-%s-%d", t.Name(), rand.Intn(1000000000))
+	tabletconn.RegisterDialer(dialerName, func(tablet *topodatapb.Tablet, failFast grpcclient.FailFast) (queryservice.QueryService, error) {
+		tme.mu.Lock()
+		defer tme.mu.Unlock()
+		for _, ft := range append(tme.sourceMasters, tme.targetMasters...) {
+			if ft.Tablet.Alias.Uid == tablet.Alias.Uid {
+				return ft, nil
+			}
+		}
+		return nil, nil
+	})
+	*tabletconn.TabletProtocol = dialerName
 
 	vs := &vschemapb.Keyspace{
 		Sharded: true,
@@ -272,6 +291,19 @@ func newTestShardMigrater(ctx context.Context, t *testing.T, sourceShards, targe
 		tme.targetKeyRanges = append(tme.targetKeyRanges, targetKeyRange)
 	}
 
+	dialerName := fmt.Sprintf("TrafficSwitcherTest-%s-%d", t.Name(), rand.Intn(1000000000))
+	tabletconn.RegisterDialer(dialerName, func(tablet *topodatapb.Tablet, failFast grpcclient.FailFast) (queryservice.QueryService, error) {
+		tme.mu.Lock()
+		defer tme.mu.Unlock()
+		for _, ft := range append(tme.sourceMasters, tme.targetMasters...) {
+			if ft.Tablet.Alias.Uid == tablet.Alias.Uid {
+				return ft, nil
+			}
+		}
+		return nil, nil
+	})
+	*tabletconn.TabletProtocol = dialerName
+
 	vs := &vschemapb.Keyspace{
 		Sharded: true,
 		Vindexes: map[string]*vschema.Vindex{
@@ -353,6 +385,8 @@ func newTestShardMigrater(ctx context.Context, t *testing.T, sourceShards, targe
 }
 
 func (tme *testMigraterEnv) startTablets(t *testing.T) {
+	tme.mu.Lock()
+	defer tme.mu.Unlock()
 	allMasters := append(tme.sourceMasters, tme.targetMasters...)
 	for _, master := range allMasters {
 		master.StartActionLoop(t, tme.wr)
@@ -387,6 +421,8 @@ func (tme *testMigraterEnv) stopTablets(t *testing.T) {
 }
 
 func (tme *testMigraterEnv) createDBClients(ctx context.Context, t *testing.T) {
+	tme.mu.Lock()
+	defer tme.mu.Unlock()
 	for _, master := range tme.sourceMasters {
 		dbclient := newFakeDBClient()
 		tme.dbSourceClients = append(tme.dbSourceClients, dbclient)
@@ -405,6 +441,22 @@ func (tme *testMigraterEnv) createDBClients(ctx context.Context, t *testing.T) {
 		master.TM.VREngine.Open(ctx)
 	}
 	tme.allDBClients = append(tme.dbSourceClients, tme.dbTargetClients...)
+}
+
+func (tme *testMigraterEnv) close(t *testing.T) {
+	tme.mu.Lock()
+	defer tme.mu.Unlock()
+	tme.stopTablets(t)
+	for _, dbclient := range tme.dbSourceClients {
+		dbclient.Close()
+	}
+	for _, dbclient := range tme.dbTargetClients {
+		dbclient.Close()
+	}
+	tme.tmeDB.CloseAllConnections()
+	tme.ts.Close()
+	tme.wr.tmc.Close()
+	tme.wr = nil
 }
 
 func (tme *testMigraterEnv) setMasterPositions() {

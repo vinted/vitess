@@ -143,6 +143,10 @@ func (st *vrStats) register() {
 		result := make(map[string]string, len(st.controllers))
 		for _, ct := range st.controllers {
 			result[fmt.Sprintf("%v", ct.id)] = ct.sourceTablet.Get()
+			ta := ct.sourceTablet.Get()
+			if ta != "" {
+				result[fmt.Sprintf("%v", ct.id)] = ta
+			}
 		}
 		return result
 	}))

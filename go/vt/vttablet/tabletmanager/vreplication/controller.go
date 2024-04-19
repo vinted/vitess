@@ -41,6 +41,13 @@ import (
 	topodatapb "vitess.io/vitess/go/vt/proto/topodata"
 )
 
+const (
+	// How many times to retry tablet selection before we
+	// give up and return an error message that the user
+	// can see and act upon if needed.
+	tabletPickerRetries = 5
+)
+
 var (
 	// deprecated flags (7.0)
 	_          = flag.Duration("vreplication_healthcheck_topology_refresh", 30*time.Second, "refresh interval for re-reading the topology")
@@ -85,6 +92,7 @@ func newController(ctx context.Context, params map[string]string, dbClientFactor
 		done:            make(chan struct{}),
 		source:          &binlogdatapb.BinlogSource{},
 	}
+	ct.sourceTablet.Set("")
 	log.Infof("creating controller with cell: %v, tabletTypes: %v, and params: %v", cell, tabletTypesStr, params)
 
 	// id
@@ -205,23 +213,11 @@ func (ct *controller) runBlp(ctx context.Context) (err error) {
 	}
 	defer dbClient.Close()
 
-	var tablet *topodatapb.Tablet
-	if ct.source.GetExternalMysql() == "" {
-		log.Infof("trying to find a tablet eligible for vreplication. stream id: %v", ct.id)
-		tablet, err = ct.tabletPicker.PickForStreaming(ctx)
-		if err != nil {
-			select {
-			case <-ctx.Done():
-			default:
-				ct.blpStats.ErrorCounts.Add([]string{"No Source Tablet Found"}, 1)
-				ct.setMessage(dbClient, fmt.Sprintf("Error picking tablet: %s", err.Error()))
-			}
-			return err
-		}
-		ct.setMessage(dbClient, fmt.Sprintf("Picked source tablet: %s", tablet.Alias.String()))
-		log.Infof("found a tablet eligible for vreplication. stream id: %v  tablet: %s", ct.id, tablet.Alias.String())
-		ct.sourceTablet.Set(tablet.Alias.String())
+	tablet, err := ct.pickSourceTablet(ctx, dbClient)
+	if err != nil {
+		return err
 	}
+
 	switch {
 	case len(ct.source.Tables) > 0:
 		// Table names can have search patterns. Resolve them against the schema.
@@ -285,6 +281,35 @@ func (ct *controller) setMessage(dbClient binlogplayer.DBClient, message string)
 	}
 	return nil
 }
+
+// pickSourceTablet picks a healthy serving tablet to source for
+// the vreplication stream. If the source is marked as external, it
+// returns nil.
+func (ct *controller) pickSourceTablet(ctx context.Context, dbClient binlogplayer.DBClient) (*topodatapb.Tablet, error) {
+	if ct.source.GetExternalMysql() != "" {
+		return nil, nil
+	}
+	log.Infof("Trying to find an eligible source tablet for vreplication stream id %d for workflow: %s",
+		ct.id, ct.workflow)
+	tpCtx, tpCancel := context.WithTimeout(ctx, discovery.GetTabletPickerRetryDelay()*tabletPickerRetries)
+	defer tpCancel()
+	tablet, err := ct.tabletPicker.PickForStreaming(tpCtx)
+	if err != nil {
+		select {
+		case <-ctx.Done():
+		default:
+			ct.blpStats.ErrorCounts.Add([]string{"No Source Tablet Found"}, 1)
+			ct.setMessage(dbClient, fmt.Sprintf("Error picking tablet: %s", err.Error()))
+		}
+		return tablet, err
+	}
+	ct.setMessage(dbClient, fmt.Sprintf("Picked source tablet: %s", tablet.Alias.String()))
+	log.Infof("Found eligible source tablet %s for vreplication stream id %d for workflow %s",
+		tablet.Alias.String(), ct.id, ct.workflow)
+	ct.sourceTablet.Set(tablet.Alias.String())
+	return tablet, err
+}
+
 func (ct *controller) Stop() {
 	ct.cancel()
 	<-ct.done
