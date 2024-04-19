@@ -414,7 +414,7 @@ func createLegacyExecutorEnv() (executor *Executor, sbc1, sbc2, sbclookup *sandb
 	hc := discovery.NewFakeLegacyHealthCheck()
 	s := createSandbox("TestExecutor")
 	s.VSchema = executorVSchema
-	serv := newSandboxForCells([]string{cell})
+	serv := newSandboxForCells(context.Background(), []string{cell})
 	resolver := newTestLegacyResolver(hc, serv, cell)
 	sbc1 = hc.AddTestTablet(cell, "-20", 1, "TestExecutor", "-20", topodatapb.TabletType_MASTER, true, 1, nil)
 	sbc2 = hc.AddTestTablet(cell, "40-60", 1, "TestExecutor", "40-60", topodatapb.TabletType_MASTER, true, 1, nil)
@@ -449,7 +449,7 @@ func createExecutorEnv() (executor *Executor, sbc1, sbc2, sbclookup *sandboxconn
 	vtgateHealthCheck = hc
 	s := createSandbox("TestExecutor")
 	s.VSchema = executorVSchema
-	serv := newSandboxForCells([]string{cell})
+	serv := newSandboxForCells(context.Background(), []string{cell})
 	resolver := newTestResolver(hc, serv, cell)
 	sbc1 = hc.AddTestTablet(cell, "-20", 1, "TestExecutor", "-20", topodatapb.TabletType_MASTER, true, 1, nil)
 	sbc2 = hc.AddTestTablet(cell, "40-60", 1, "TestExecutor", "40-60", topodatapb.TabletType_MASTER, true, 1, nil)
@@ -481,7 +481,7 @@ func createCustomExecutor(vschema string) (executor *Executor, sbc1, sbc2, sbclo
 	hc := discovery.NewFakeLegacyHealthCheck()
 	s := createSandbox("TestExecutor")
 	s.VSchema = vschema
-	serv := newSandboxForCells([]string{cell})
+	serv := newSandboxForCells(context.Background(), []string{cell})
 	resolver := newTestLegacyResolver(hc, serv, cell)
 	sbc1 = hc.AddTestTablet(cell, "-20", 1, "TestExecutor", "-20", topodatapb.TabletType_MASTER, true, 1, nil)
 	sbc2 = hc.AddTestTablet(cell, "40-60", 1, "TestExecutor", "40-60", topodatapb.TabletType_MASTER, true, 1, nil)
@@ -499,7 +499,7 @@ func createCustomExecutorSetValues(vschema string, values []*sqltypes.Result) (e
 	hc := discovery.NewFakeLegacyHealthCheck()
 	s := createSandbox("TestExecutor")
 	s.VSchema = vschema
-	serv := newSandboxForCells([]string{cell})
+	serv := newSandboxForCells(context.Background(), []string{cell})
 	resolver := newTestLegacyResolver(hc, serv, cell)
 	shards := []string{"-20", "20-40", "40-60", "60-80", "80-a0", "a0-c0", "c0-e0", "e0-"}
 	sbcs := []*sandboxconn.SandboxConn{}

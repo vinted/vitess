@@ -334,6 +334,136 @@ func TestVStreamMulti(t *testing.T) {
 	}
 }
 
+func TestVStreamRetriableErrors(t *testing.T) {
+	type testCase struct {
+		name         string
+		code         vtrpcpb.Code
+		msg          string
+		shouldRetry  bool
+		ignoreTablet bool
+	}
+
+	tcases := []testCase{
+		{
+			name:         "failed precondition",
+			code:         vtrpcpb.Code_FAILED_PRECONDITION,
+			msg:          "",
+			shouldRetry:  true,
+			ignoreTablet: false,
+		},
+		{
+			name:         "gtid mismatch",
+			code:         vtrpcpb.Code_INVALID_ARGUMENT,
+			msg:          "GTIDSet Mismatch aa",
+			shouldRetry:  true,
+			ignoreTablet: true,
+		},
+		{
+			name:         "unavailable",
+			code:         vtrpcpb.Code_UNAVAILABLE,
+			msg:          "",
+			shouldRetry:  true,
+			ignoreTablet: false,
+		},
+		{
+			name:         "should not retry",
+			code:         vtrpcpb.Code_INVALID_ARGUMENT,
+			msg:          "final error",
+			shouldRetry:  false,
+			ignoreTablet: false,
+		},
+	}
+
+	commit := []*binlogdatapb.VEvent{
+		{Type: binlogdatapb.VEventType_COMMIT},
+	}
+
+	want := &binlogdatapb.VStreamResponse{Events: commit}
+
+	for _, tcase := range tcases {
+		t.Run(tcase.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// aa will be the local cell for this test, but that tablet will have a vstream error.
+			cells := []string{"aa", "ab"}
+
+			ks := "TestVStream"
+			_ = createSandbox(ks)
+			hc := discovery.NewFakeHealthCheck()
+
+			st := getSandboxTopoMultiCell(ctx, cells, ks, []string{"-20"})
+
+			sbc0 := hc.AddTestTablet(cells[0], "1.1.1.1", 1001, ks, "-20", topodatapb.TabletType_REPLICA, true, 1, nil)
+			sbc1 := hc.AddTestTablet(cells[1], "1.1.1.1", 1002, ks, "-20", topodatapb.TabletType_REPLICA, true, 1, nil)
+
+			addTabletToSandboxTopo(t, st, ks, "-20", sbc0.Tablet())
+			addTabletToSandboxTopo(t, st, ks, "-20", sbc1.Tablet())
+
+			vsm := newTestVStreamManager(hc, st, cells[0])
+
+			// Always have the local cell tablet error so it's ignored on retry and we pick the other one
+			// if the error requires ignoring the tablet on retry.
+			sbc0.AddVStreamEvents(nil, vterrors.Errorf(tcase.code, tcase.msg))
+
+			if tcase.ignoreTablet {
+				sbc1.AddVStreamEvents(commit, nil)
+			} else {
+				sbc0.AddVStreamEvents(commit, nil)
+			}
+
+			vgtid := &binlogdatapb.VGtid{
+				ShardGtids: []*binlogdatapb.ShardGtid{{
+					Keyspace: ks,
+					Shard:    "-20",
+					Gtid:     "pos",
+				}},
+			}
+
+			ch := make(chan *binlogdatapb.VStreamResponse)
+			done := make(chan struct{})
+			go func() {
+				err := vsm.VStream(ctx, topodatapb.TabletType_REPLICA, vgtid, nil, &vtgatepb.VStreamFlags{Cells: strings.Join(cells, ",")}, func(events []*binlogdatapb.VEvent) error {
+					ch <- &binlogdatapb.VStreamResponse{Events: events}
+					return nil
+				})
+				wantErr := "context canceled"
+
+				if !tcase.shouldRetry {
+					wantErr = tcase.msg
+				}
+
+				if err == nil || !strings.Contains(err.Error(), wantErr) {
+					t.Errorf("vstream end: %v, must contain %v", err.Error(), wantErr)
+				}
+				close(done)
+			}()
+
+		Loop:
+			for {
+				if tcase.shouldRetry {
+					select {
+					case event := <-ch:
+						got := proto.Clone(event)
+						// got := event.CloneVT()
+						if !proto.Equal(got, want) {
+							t.Errorf("got different vstream event than expected")
+						}
+						cancel()
+					case <-done:
+						// The goroutine has completed, so break out of the loop
+						break Loop
+					}
+				} else {
+					<-done
+					break Loop
+				}
+			}
+		})
+	}
+
+}
+
 func TestVStreamRetry(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1130,10 +1260,26 @@ func getVEvents(keyspace, shard string, count, idx int64) []*binlogdatapb.VEvent
 }
 
 func getSandboxTopo(ctx context.Context, cell string, keyspace string, shards []string) *sandboxTopo {
-	st := newSandboxForCells([]string{cell})
+	st := newSandboxForCells(ctx, []string{cell})
 	ts := st.topoServer
 	ts.CreateCellInfo(ctx, cell, &topodatapb.CellInfo{})
 	ts.CreateKeyspace(ctx, keyspace, &topodatapb.Keyspace{})
+	for _, shard := range shards {
+		ts.CreateShard(ctx, keyspace, shard)
+	}
+	return st
+}
+
+func getSandboxTopoMultiCell(ctx context.Context, cells []string, keyspace string, shards []string) *sandboxTopo {
+	st := newSandboxForCells(ctx, cells)
+	ts := st.topoServer
+
+	for _, cell := range cells {
+		ts.CreateCellInfo(ctx, cell, &topodatapb.CellInfo{})
+	}
+
+	ts.CreateKeyspace(ctx, keyspace, &topodatapb.Keyspace{})
+
 	for _, shard := range shards {
 		ts.CreateShard(ctx, keyspace, shard)
 	}

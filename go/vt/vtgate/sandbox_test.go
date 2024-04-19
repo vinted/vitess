@@ -222,7 +222,7 @@ type sandboxTopo struct {
 // the given cells.
 //
 // when this version is used, WatchSrvVSchema can properly simulate watches
-func newSandboxForCells(cells []string) *sandboxTopo {
+func newSandboxForCells(ctx context.Context, cells []string) *sandboxTopo {
 	return &sandboxTopo{
 		topoServer: memorytopo.NewServer(cells...),
 	}
