@@ -28,21 +28,32 @@ import (
 	"vitess.io/vitess/go/vt/throttler"
 
 	binlogdatapb "vitess.io/vitess/go/vt/proto/binlogdata"
+	querypb "vitess.io/vitess/go/vt/proto/query"
 	topodatapb "vitess.io/vitess/go/vt/proto/topodata"
 )
 
 var (
 	testSettingsResponse = &sqltypes.Result{
-		Fields:       nil,
+		Fields: []*querypb.Field{
+			{Name: "pos", Type: sqltypes.VarBinary},
+			{Name: "stop_pos", Type: sqltypes.VarBinary},
+			{Name: "max_tps", Type: sqltypes.Int64},
+			{Name: "max_replication_lag", Type: sqltypes.Int64},
+			{Name: "state", Type: sqltypes.VarBinary},
+			{Name: "workflow_type", Type: sqltypes.Int64},
+			{Name: "workflow", Type: sqltypes.VarChar},
+		},
 		RowsAffected: 1,
 		InsertID:     0,
 		Rows: [][]sqltypes.Value{
 			{
 				sqltypes.NewVarBinary("MariaDB/0-1-1083"), // pos
-				sqltypes.NULL, // stop_pos
-				sqltypes.NewVarBinary("9223372036854775807"), // max_tps
-				sqltypes.NewVarBinary("9223372036854775807"), // max_replication_lag
-				sqltypes.NewVarBinary("Running"),             // state
+				sqltypes.NULL,                          // stop_pos
+				sqltypes.NewInt64(9223372036854775807), // max_tps
+				sqltypes.NewInt64(9223372036854775807), // max_replication_lag
+				sqltypes.NewVarBinary("Running"),       // state
+				sqltypes.NewInt64(1),                   // workflow_type
+				sqltypes.NewVarChar("wf"),              // workflow
 			},
 		},
 	}
@@ -53,7 +64,7 @@ var (
 func TestNewBinlogPlayerKeyRange(t *testing.T) {
 	dbClient := NewMockDBClient(t)
 	dbClient.ExpectRequest("update _vt.vreplication set state='Running', message='' where id=1", testDMLResponse, nil)
-	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state from _vt.vreplication where id=1", testSettingsResponse, nil)
+	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state, workflow_type, workflow from _vt.vreplication where id=1", testSettingsResponse, nil)
 	dbClient.ExpectRequest("begin", nil, nil)
 	dbClient.ExpectRequest("insert into t values(1)", testDMLResponse, nil)
 	dbClient.ExpectRequestRE("update _vt.vreplication set pos='MariaDB/0-1-1235', time_updated=.*", testDMLResponse, nil)
@@ -84,7 +95,7 @@ func TestNewBinlogPlayerKeyRange(t *testing.T) {
 func TestNewBinlogPlayerTables(t *testing.T) {
 	dbClient := NewMockDBClient(t)
 	dbClient.ExpectRequest("update _vt.vreplication set state='Running', message='' where id=1", testDMLResponse, nil)
-	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state from _vt.vreplication where id=1", testSettingsResponse, nil)
+	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state, workflow_type, workflow from _vt.vreplication where id=1", testSettingsResponse, nil)
 	dbClient.ExpectRequest("begin", nil, nil)
 	dbClient.ExpectRequest("insert into t values(1)", testDMLResponse, nil)
 	dbClient.ExpectRequestRE("update _vt.vreplication set pos='MariaDB/0-1-1235', time_updated=.*", testDMLResponse, nil)
@@ -116,7 +127,7 @@ func TestNewBinlogPlayerTables(t *testing.T) {
 func TestApplyEventsFail(t *testing.T) {
 	dbClient := NewMockDBClient(t)
 	dbClient.ExpectRequest("update _vt.vreplication set state='Running', message='' where id=1", testDMLResponse, nil)
-	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state from _vt.vreplication where id=1", testSettingsResponse, nil)
+	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state, workflow_type, workflow from _vt.vreplication where id=1", testSettingsResponse, nil)
 	dbClient.ExpectRequest("begin", nil, errors.New("err"))
 	dbClient.ExpectRequest("update _vt.vreplication set state='Error', message='error in processing binlog event failed query BEGIN, err: err' where id=1", testDMLResponse, nil)
 
@@ -133,25 +144,37 @@ func TestApplyEventsFail(t *testing.T) {
 	}
 }
 
+var settingsFields []*querypb.Field = []*querypb.Field{
+	{Name: "pos", Type: sqltypes.VarBinary},
+	{Name: "stop_pos", Type: sqltypes.VarBinary},
+	{Name: "max_tps", Type: sqltypes.Int64},
+	{Name: "max_replication_lag", Type: sqltypes.Int64},
+	{Name: "state", Type: sqltypes.VarBinary},
+	{Name: "workflow_type", Type: sqltypes.Int64},
+	{Name: "workflow", Type: sqltypes.VarChar},
+}
+
 // TestStopPosEqual ensures player stops if stopPos==pos.
 func TestStopPosEqual(t *testing.T) {
 	dbClient := NewMockDBClient(t)
 	dbClient.ExpectRequest("update _vt.vreplication set state='Running', message='' where id=1", testDMLResponse, nil)
 	posEqual := &sqltypes.Result{
-		Fields:       nil,
+		Fields:       settingsFields,
 		RowsAffected: 1,
 		InsertID:     0,
 		Rows: [][]sqltypes.Value{
 			{
-				sqltypes.NewVarBinary("MariaDB/0-1-1083"),    // pos
-				sqltypes.NewVarBinary("MariaDB/0-1-1083"),    // stop_pos
-				sqltypes.NewVarBinary("9223372036854775807"), // max_tps
-				sqltypes.NewVarBinary("9223372036854775807"), // max_replication_lag
-				sqltypes.NewVarBinary("Running"),             // state
+				sqltypes.NewVarBinary("MariaDB/0-1-1083"), // pos
+				sqltypes.NewVarBinary("MariaDB/0-1-1083"), // stop_pos
+				sqltypes.NewInt64(9223372036854775807),    // max_tps
+				sqltypes.NewInt64(9223372036854775807),    // max_replication_lag
+				sqltypes.NewVarBinary("Running"),          // state
+				sqltypes.NewInt64(1),                      // workflow_type
+				sqltypes.NewVarChar("wf"),                 // workflow
 			},
 		},
 	}
-	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state from _vt.vreplication where id=1", posEqual, nil)
+	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state, workflow_type, workflow from _vt.vreplication where id=1", posEqual, nil)
 	dbClient.ExpectRequest(`update _vt.vreplication set state='Stopped', message='not starting BinlogPlayer, we\'re already at the desired position 0-1-1083' where id=1`, testDMLResponse, nil)
 
 	_ = newFakeBinlogClient()
@@ -171,20 +194,22 @@ func TestStopPosLess(t *testing.T) {
 	dbClient := NewMockDBClient(t)
 	dbClient.ExpectRequest("update _vt.vreplication set state='Running', message='' where id=1", testDMLResponse, nil)
 	posEqual := &sqltypes.Result{
-		Fields:       nil,
+		Fields:       settingsFields,
 		RowsAffected: 1,
 		InsertID:     0,
 		Rows: [][]sqltypes.Value{
 			{
-				sqltypes.NewVarBinary("MariaDB/0-1-1083"),    // pos
-				sqltypes.NewVarBinary("MariaDB/0-1-1082"),    // stop_pos
-				sqltypes.NewVarBinary("9223372036854775807"), // max_tps
-				sqltypes.NewVarBinary("9223372036854775807"), // max_replication_lag
-				sqltypes.NewVarBinary("Running"),             // state
+				sqltypes.NewVarBinary("MariaDB/0-1-1083"), // pos
+				sqltypes.NewVarBinary("MariaDB/0-1-1082"), // stop_pos
+				sqltypes.NewInt64(9223372036854775807),    // max_tps
+				sqltypes.NewInt64(9223372036854775807),    // max_replication_lag
+				sqltypes.NewVarBinary("Running"),          // state
+				sqltypes.NewInt64(1),                      // workflow_type
+				sqltypes.NewVarChar("wf"),                 // workflow
 			},
 		},
 	}
-	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state from _vt.vreplication where id=1", posEqual, nil)
+	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state, workflow_type, workflow from _vt.vreplication where id=1", posEqual, nil)
 	dbClient.ExpectRequest(`update _vt.vreplication set state='Stopped', message='starting point 0-1-1083 greater than stopping point 0-1-1082' where id=1`, testDMLResponse, nil)
 
 	_ = newFakeBinlogClient()
@@ -204,20 +229,22 @@ func TestStopPosGreater(t *testing.T) {
 	dbClient := NewMockDBClient(t)
 	dbClient.ExpectRequest("update _vt.vreplication set state='Running', message='' where id=1", testDMLResponse, nil)
 	posEqual := &sqltypes.Result{
-		Fields:       nil,
+		Fields:       settingsFields,
 		RowsAffected: 1,
 		InsertID:     0,
 		Rows: [][]sqltypes.Value{
 			{
-				sqltypes.NewVarBinary("MariaDB/0-1-1083"),    // pos
-				sqltypes.NewVarBinary("MariaDB/0-1-1085"),    // stop_pos
-				sqltypes.NewVarBinary("9223372036854775807"), // max_tps
-				sqltypes.NewVarBinary("9223372036854775807"), // max_replication_lag
-				sqltypes.NewVarBinary("Running"),             // state
+				sqltypes.NewVarBinary("MariaDB/0-1-1083"), // pos
+				sqltypes.NewVarBinary("MariaDB/0-1-1085"), // stop_pos
+				sqltypes.NewInt64(9223372036854775807),    // max_tps
+				sqltypes.NewInt64(9223372036854775807),    // max_replication_lag
+				sqltypes.NewVarBinary("Running"),          // state
+				sqltypes.NewInt64(1),                      // workflow_type
+				sqltypes.NewVarChar("wf"),                 // workflow
 			},
 		},
 	}
-	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state from _vt.vreplication where id=1", posEqual, nil)
+	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state, workflow_type, workflow from _vt.vreplication where id=1", posEqual, nil)
 	dbClient.ExpectRequest("begin", nil, nil)
 	dbClient.ExpectRequest("insert into t values(1)", testDMLResponse, nil)
 	dbClient.ExpectRequestRE("update _vt.vreplication set pos='MariaDB/0-1-1235', time_updated=.*", testDMLResponse, nil)
@@ -241,20 +268,22 @@ func TestContextCancel(t *testing.T) {
 	dbClient := NewMockDBClient(t)
 	dbClient.ExpectRequest("update _vt.vreplication set state='Running', message='' where id=1", testDMLResponse, nil)
 	posEqual := &sqltypes.Result{
-		Fields:       nil,
+		Fields:       settingsFields,
 		RowsAffected: 1,
 		InsertID:     0,
 		Rows: [][]sqltypes.Value{
 			{
-				sqltypes.NewVarBinary("MariaDB/0-1-1083"),    // pos
-				sqltypes.NewVarBinary("MariaDB/0-1-1085"),    // stop_pos
-				sqltypes.NewVarBinary("9223372036854775807"), // max_tps
-				sqltypes.NewVarBinary("9223372036854775807"), // max_replication_lag
-				sqltypes.NewVarBinary("Running"),             // state
+				sqltypes.NewVarBinary("MariaDB/0-1-1083"), // pos
+				sqltypes.NewVarBinary("MariaDB/0-1-1085"), // stop_pos
+				sqltypes.NewInt64(9223372036854775807),    // max_tps
+				sqltypes.NewInt64(9223372036854775807),    // max_replication_lag
+				sqltypes.NewVarBinary("Running"),          // state
+				sqltypes.NewInt64(1),                      // workflow_type
+				sqltypes.NewVarChar("wf"),                 // workflow
 			},
 		},
 	}
-	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state from _vt.vreplication where id=1", posEqual, nil)
+	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state, workflow_type, workflow from _vt.vreplication where id=1", posEqual, nil)
 	dbClient.ExpectRequest("begin", nil, nil)
 	dbClient.ExpectRequest("insert into t values(1)", testDMLResponse, nil)
 	dbClient.ExpectRequestRE("update _vt.vreplication set pos='MariaDB/0-1-1235', time_updated=.*", testDMLResponse, nil)
@@ -281,7 +310,7 @@ func TestContextCancel(t *testing.T) {
 func TestRetryOnDeadlock(t *testing.T) {
 	dbClient := NewMockDBClient(t)
 	dbClient.ExpectRequest("update _vt.vreplication set state='Running', message='' where id=1", testDMLResponse, nil)
-	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state from _vt.vreplication where id=1", testSettingsResponse, nil)
+	dbClient.ExpectRequest("select pos, stop_pos, max_tps, max_replication_lag, state, workflow_type, workflow from _vt.vreplication where id=1", testSettingsResponse, nil)
 	deadlocked := &mysql.SQLError{Num: 1213, Message: "deadlocked"}
 	dbClient.ExpectRequest("begin", nil, nil)
 	dbClient.ExpectRequest("insert into t values(1)", nil, deadlocked)
@@ -321,8 +350,8 @@ func applyEvents(blp *BinlogPlayer) func() error {
 
 func TestCreateVReplicationKeyRange(t *testing.T) {
 	want := "insert into _vt.vreplication " +
-		"(workflow, source, pos, max_tps, max_replication_lag, time_updated, transaction_timestamp, state, db_name) " +
-		`values ('Resharding', 'keyspace:\"ks\" shard:\"0\" key_range:{end:\"\\x80\"}', 'MariaDB/0-1-1083', 9223372036854775807, 9223372036854775807, 481823, 0, 'Running', 'db')`
+		"(workflow, source, pos, max_tps, max_replication_lag, time_updated, transaction_timestamp, state, db_name, workflow_type) " +
+		`values ('Resharding', 'keyspace:\"ks\" shard:\"0\" key_range:{end:\"\\x80\"}', 'MariaDB/0-1-1083', 9223372036854775807, 9223372036854775807, 481823, 0, 'Running', 'db', 0)`
 
 	bls := binlogdatapb.BinlogSource{
 		Keyspace: "ks",
@@ -332,7 +361,7 @@ func TestCreateVReplicationKeyRange(t *testing.T) {
 		},
 	}
 
-	got := CreateVReplication("Resharding", &bls, "MariaDB/0-1-1083", throttler.MaxRateModuleDisabled, throttler.ReplicationLagModuleDisabled, 481823, "db")
+	got := CreateVReplication("Resharding", &bls, "MariaDB/0-1-1083", throttler.MaxRateModuleDisabled, throttler.ReplicationLagModuleDisabled, 481823, "db", 0)
 	if got != want {
 		t.Errorf("CreateVReplication() =\n%v, want\n%v", got, want)
 	}
@@ -340,8 +369,8 @@ func TestCreateVReplicationKeyRange(t *testing.T) {
 
 func TestCreateVReplicationTables(t *testing.T) {
 	want := "insert into _vt.vreplication " +
-		"(workflow, source, pos, max_tps, max_replication_lag, time_updated, transaction_timestamp, state, db_name) " +
-		`values ('Resharding', 'keyspace:\"ks\" shard:\"0\" tables:\"a\" tables:\"b\"', 'MariaDB/0-1-1083', 9223372036854775807, 9223372036854775807, 481823, 0, 'Running', 'db')`
+		"(workflow, source, pos, max_tps, max_replication_lag, time_updated, transaction_timestamp, state, db_name, workflow_type) " +
+		`values ('Resharding', 'keyspace:\"ks\" shard:\"0\" tables:\"a\" tables:\"b\"', 'MariaDB/0-1-1083', 9223372036854775807, 9223372036854775807, 481823, 0, 'Running', 'db', 0)`
 
 	bls := binlogdatapb.BinlogSource{
 		Keyspace: "ks",
@@ -349,7 +378,7 @@ func TestCreateVReplicationTables(t *testing.T) {
 		Tables:   []string{"a", "b"},
 	}
 
-	got := CreateVReplication("Resharding", &bls, "MariaDB/0-1-1083", throttler.MaxRateModuleDisabled, throttler.ReplicationLagModuleDisabled, 481823, "db")
+	got := CreateVReplication("Resharding", &bls, "MariaDB/0-1-1083", throttler.MaxRateModuleDisabled, throttler.ReplicationLagModuleDisabled, 481823, "db", 0)
 	if got != want {
 		t.Errorf("CreateVReplication() =\n%v, want\n%v", got, want)
 	}

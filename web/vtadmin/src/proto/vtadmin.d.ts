@@ -35112,6 +35112,16 @@ export namespace binlogdata {
         EXEC_IGNORE = 3
     }
 
+    /** VReplicationWorkflowType enum. */
+    enum VReplicationWorkflowType {
+        Materialize = 0,
+        MoveTables = 1,
+        CreateLookupIndex = 2,
+        Migrate = 3,
+        Reshard = 4,
+        OnlineDDL = 5
+    }
+
     /** Properties of a BinlogSource. */
     interface IBinlogSource {
 

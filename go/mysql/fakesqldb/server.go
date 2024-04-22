@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"testing"
@@ -400,7 +401,9 @@ func (db *DB) HandleQuery(c *mysql.Conn, query string, callback func(*sqltypes.R
 	}
 
 	// Nothing matched.
-	return fmt.Errorf("query: '%s' is not supported on %v", query, db.name)
+	err := fmt.Errorf("query: '%s' is not supported on %v", query, db.name)
+	log.Errorf("Query not found: %s:%s", query, debug.Stack())
+	return err
 }
 
 func (db *DB) comQueryOrdered(query string) (*sqltypes.Result, error) {
@@ -565,12 +568,12 @@ func (db *DB) GetQueryCalledNum(query string) int {
 	return num
 }
 
-//QueryLog returns the query log in a semicomma separated string
+// QueryLog returns the query log in a semicomma separated string
 func (db *DB) QueryLog() string {
 	return strings.Join(db.querylog, ";")
 }
 
-//ResetQueryLog resets the query log
+// ResetQueryLog resets the query log
 func (db *DB) ResetQueryLog() {
 	db.querylog = nil
 }

@@ -386,6 +386,7 @@ type ReplicationStatus struct {
 	// Message represents the message column from the _vt.vreplication table.
 	Message string
 
+	WorkflowType string
 	// CopyState represents the rows from the _vt.copy_state table.
 	CopyState []copyState
 }
@@ -394,6 +395,7 @@ func (wr *Wrangler) getReplicationStatusFromRow(ctx context.Context, row []sqlty
 	var err error
 	var id, timeUpdated, transactionTimestamp int64
 	var state, dbName, pos, stopPos, message string
+	var workflowType int64
 	var bls binlogdatapb.BinlogSource
 	var mpos mysql.Position
 
@@ -426,6 +428,10 @@ func (wr *Wrangler) getReplicationStatusFromRow(ctx context.Context, row []sqlty
 		return nil, "", err
 	}
 	message = row[9].ToString()
+	workflowType, err = evalengine.ToInt64(row[10])
+	if err != nil {
+		return nil, "", err
+	}
 	status := &ReplicationStatus{
 		Shard:                master.Shard,
 		Tablet:               master.AliasString(),
@@ -438,6 +444,7 @@ func (wr *Wrangler) getReplicationStatusFromRow(ctx context.Context, row []sqlty
 		TransactionTimestamp: transactionTimestamp,
 		TimeUpdated:          timeUpdated,
 		Message:              message,
+		WorkflowType:         binlogdatapb.VReplicationWorkflowType_name[int32(workflowType)],
 	}
 	status.CopyState, err = wr.getCopyState(ctx, master, id)
 	if err != nil {
@@ -453,7 +460,7 @@ func (wr *Wrangler) getStreams(ctx context.Context, workflow, keyspace string) (
 	rsr.ShardStatuses = make(map[string]*ShardReplicationStatus)
 	rsr.Workflow = workflow
 	var results map[*topo.TabletInfo]*querypb.QueryResult
-	query := "select id, source, pos, stop_pos, max_replication_lag, state, db_name, time_updated, transaction_timestamp, message from _vt.vreplication"
+	query := "select id, source, pos, stop_pos, max_replication_lag, state, db_name, time_updated, transaction_timestamp, message, workflow_type from _vt.vreplication"
 	results, err := wr.runVexec(ctx, workflow, keyspace, query, false)
 	if err != nil {
 		return nil, err

@@ -34,6 +34,7 @@ type VReplicationStream struct {
 	Workflow     string
 	BinlogSource *binlogdatapb.BinlogSource
 	Position     mysql.Position
+	WorkflowType binlogdatapb.VReplicationWorkflowType
 }
 
 // VReplicationStreams wraps a slice of VReplicationStream objects to provide

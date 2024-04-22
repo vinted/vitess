@@ -92,6 +92,7 @@ type trafficSwitcher struct {
 	optTabletTypes  string //tabletTypes option passed to MoveTables/Reshard
 	externalCluster string
 	externalTopo    *topo.Server
+	workflowType    binlogdatapb.VReplicationWorkflowType
 }
 
 /*
@@ -840,6 +841,7 @@ func (wr *Wrangler) buildTrafficSwitcher(ctx context.Context, targetKeyspace, wo
 		frozen:          frozen,
 		optCells:        optCells,
 		optTabletTypes:  optTabletTypes,
+		workflowType:    tgtInfo.WorkflowType,
 	}
 	log.Infof("Migration ID for workflow %s: %d", workflowName, ts.id)
 	sourceTopo := wr.ts
@@ -1227,7 +1229,9 @@ func (ts *trafficSwitcher) createReverseVReplication(ctx context.Context) error 
 		}
 		log.Infof("Creating reverse workflow vreplication stream on tablet %s: workflow %s, startPos %s",
 			source.GetPrimary().Alias, ts.ReverseWorkflowName(), target.Position)
-		_, err := ts.VReplicationExec(ctx, source.GetPrimary().Alias, binlogplayer.CreateVReplicationState(ts.ReverseWorkflowName(), reverseBls, target.Position, binlogplayer.BlpStopped, source.GetPrimary().DbName()))
+		_, err := ts.VReplicationExec(ctx, source.GetPrimary().Alias,
+			binlogplayer.CreateVReplicationState(ts.ReverseWorkflowName(), reverseBls, target.Position,
+				binlogplayer.BlpStopped, source.GetPrimary().DbName(), ts.workflowType))
 		if err != nil {
 			return err
 		}

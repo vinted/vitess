@@ -48,9 +48,9 @@ import (
 	"vitess.io/vitess/go/vt/vttablet/tmclient"
 )
 
-const vreplQueryks = "select id, source, message, cell, tablet_types from _vt.vreplication where workflow='test' and db_name='vt_ks'"
-const vreplQueryks2 = "select id, source, message, cell, tablet_types from _vt.vreplication where workflow='test' and db_name='vt_ks2'"
-const vreplQueryks1 = "select id, source, message, cell, tablet_types from _vt.vreplication where workflow='test_reverse' and db_name='vt_ks1'"
+const vreplQueryks = "select id, source, message, cell, tablet_types, workflow_type from _vt.vreplication where workflow='test' and db_name='vt_ks'"
+const vreplQueryks2 = "select id, source, message, cell, tablet_types, workflow_type from _vt.vreplication where workflow='test' and db_name='vt_ks2'"
+const vreplQueryks1 = "select id, source, message, cell, tablet_types, workflow_type from _vt.vreplication where workflow='test_reverse' and db_name='vt_ks1'"
 
 type testMigraterEnv struct {
 	ts              *topo.Server
@@ -208,8 +208,8 @@ func newTestTableMigraterCustom(ctx context.Context, t *testing.T, sourceShards,
 			rows = append(rows, fmt.Sprintf("%d|%v|||", j+1, bls))
 		}
 		tme.dbTargetClients[i].addInvariant(vreplQueryks2, sqltypes.MakeTestResult(sqltypes.MakeTestFields(
-			"id|source|message|cell|tablet_types",
-			"int64|varchar|varchar|varchar|varchar"),
+			"id|source|message|cell|tablet_types|workflow_type",
+			"int64|varchar|varchar|varchar|varchar|int64"),
 			rows...),
 		)
 	}
@@ -233,8 +233,8 @@ func newTestTableMigraterCustom(ctx context.Context, t *testing.T, sourceShards,
 			rows = append(rows, fmt.Sprintf("%d|%v|||", j+1, bls))
 		}
 		tme.dbSourceClients[i].addInvariant(vreplQueryks1, sqltypes.MakeTestResult(sqltypes.MakeTestFields(
-			"id|source|message|cell|tablet_types",
-			"int64|varchar|varchar|varchar|varchar"),
+			"id|source|message|cell|tablet_types|workflow_type",
+			"int64|varchar|varchar|varchar|varchar|int64"),
 			rows...),
 		)
 	}
@@ -362,17 +362,17 @@ func newTestShardMigrater(ctx context.Context, t *testing.T, sourceShards, targe
 					}},
 				},
 			}
-			rows = append(rows, fmt.Sprintf("%d|%v|||", j+1, bls))
-			rowsRdOnly = append(rows, fmt.Sprintf("%d|%v|||RDONLY", j+1, bls))
+			rows = append(rows, fmt.Sprintf("%d|%v||||0", j+1, bls))
+			rowsRdOnly = append(rows, fmt.Sprintf("%d|%v|||RDONLY|0", j+1, bls))
 		}
 		tme.dbTargetClients[i].addInvariant(vreplQueryks, sqltypes.MakeTestResult(sqltypes.MakeTestFields(
-			"id|source|message|cell|tablet_types",
-			"int64|varchar|varchar|varchar|varchar"),
+			"id|source|message|cell|tablet_types|workflow_type",
+			"int64|varchar|varchar|varchar|varchar|int64"),
 			rows...),
 		)
 		tme.dbTargetClients[i].addInvariant(vreplQueryks+"-rdonly", sqltypes.MakeTestResult(sqltypes.MakeTestFields(
-			"id|source|message|cell|tablet_types",
-			"int64|varchar|varchar|varchar|varchar"),
+			"id|source|message|cell|tablet_types|workflow_type",
+			"int64|varchar|varchar|varchar|varchar|int64"),
 			rowsRdOnly...),
 		)
 	}

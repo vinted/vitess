@@ -32,8 +32,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"vitess.io/vitess/go/vt/vtgate/evalengine"
-
 	"context"
 
 	"vitess.io/vitess/go/history"
@@ -471,12 +469,12 @@ func (blp *BinlogPlayer) exec(sql string) (*sqltypes.Result, error) {
 // writeRecoveryPosition writes the current GTID as the recovery position
 // for the next transaction.
 // It also tries to get the timestamp for the transaction. Two cases:
-// - we have statements, and they start with a SET TIMESTAMP that we
-//   can parse: then we update transaction_timestamp in vreplication
-//   with it, and set SecondsBehindMaster to now() - transaction_timestamp
-// - otherwise (the statements are probably filtered out), we leave
-//   transaction_timestamp alone (keeping the old value), and we don't
-//   change SecondsBehindMaster
+//   - we have statements, and they start with a SET TIMESTAMP that we
+//     can parse: then we update transaction_timestamp in vreplication
+//     with it, and set SecondsBehindMaster to now() - transaction_timestamp
+//   - otherwise (the statements are probably filtered out), we leave
+//     transaction_timestamp alone (keeping the old value), and we don't
+//     change SecondsBehindMaster
 func (blp *BinlogPlayer) writeRecoveryPosition(tx *binlogdatapb.BinlogTransaction) error {
 	position, err := DecodePosition(tx.EventToken.Position)
 	if err != nil {
@@ -563,6 +561,7 @@ var AlterVReplicationTable = []string{
 	"ALTER TABLE _vt.vreplication MODIFY source BLOB NOT NULL",
 	"ALTER TABLE _vt.vreplication ADD KEY workflow_idx (workflow(64))",
 	"ALTER TABLE _vt.vreplication ADD COLUMN rows_copied BIGINT(20) NOT NULL DEFAULT 0",
+	"ALTER TABLE _vt.vreplication ADD COLUMN workflow_type int NOT NULL DEFAULT 0",
 }
 
 // WithDDLInitialQueries contains the queries to be expected by the mock db client during tests
@@ -578,12 +577,14 @@ type VRSettings struct {
 	MaxTPS            int64
 	MaxReplicationLag int64
 	State             string
+	WorkflowType      int32
+	WorkflowName      string
 }
 
 // ReadVRSettings retrieves the throttler settings for
 // vreplication from the checkpoint table.
 func ReadVRSettings(dbClient DBClient, uid uint32) (VRSettings, error) {
-	query := fmt.Sprintf("select pos, stop_pos, max_tps, max_replication_lag, state from _vt.vreplication where id=%v", uid)
+	query := fmt.Sprintf("select pos, stop_pos, max_tps, max_replication_lag, state, workflow_type, workflow from _vt.vreplication where id=%v", uid)
 	qr, err := dbClient.ExecuteFetch(query, 1)
 	if err != nil {
 		return VRSettings{}, fmt.Errorf("error %v in selecting vreplication settings %v", err, query)
@@ -592,49 +593,60 @@ func ReadVRSettings(dbClient DBClient, uid uint32) (VRSettings, error) {
 	if len(qr.Rows) != 1 {
 		return VRSettings{}, fmt.Errorf("checkpoint information not available in db for %v", uid)
 	}
-	vrRow := qr.Rows[0]
+	vrRow := qr.Named().Row()
 
-	maxTPS, err := evalengine.ToInt64(vrRow[2])
+	maxTPS, err := vrRow.ToInt64("max_tps")
 	if err != nil {
-		return VRSettings{}, fmt.Errorf("failed to parse max_tps column: %v", err)
+		return VRSettings{}, fmt.Errorf("failed to parse max_tps column2: %v", err)
 	}
-	maxReplicationLag, err := evalengine.ToInt64(vrRow[3])
+	maxReplicationLag, err := vrRow.ToInt64("max_replication_lag")
 	if err != nil {
 		return VRSettings{}, fmt.Errorf("failed to parse max_replication_lag column: %v", err)
 	}
-	startPos, err := DecodePosition(vrRow[0].ToString())
+	startPos, err := DecodePosition(vrRow.AsString("pos", ""))
 	if err != nil {
 		return VRSettings{}, fmt.Errorf("failed to parse pos column: %v", err)
 	}
-	stopPos, err := mysql.DecodePosition(vrRow[1].ToString())
+	stopPos, err := mysql.DecodePosition(vrRow.AsString("stop_pos", ""))
 	if err != nil {
 		return VRSettings{}, fmt.Errorf("failed to parse stop_pos column: %v", err)
 	}
+	workflowTypeTmp, err := vrRow.ToInt64("workflow_type")
+	if err != nil {
+		return VRSettings{}, fmt.Errorf("failed to parse workflow_type column: %v", err)
+	}
+	workflowType := int32(workflowTypeTmp)
 
 	return VRSettings{
 		StartPos:          startPos,
 		StopPos:           stopPos,
 		MaxTPS:            maxTPS,
 		MaxReplicationLag: maxReplicationLag,
-		State:             vrRow[4].ToString(),
+		State:             vrRow.AsString("state", ""),
+		WorkflowType:      workflowType,
+		WorkflowName:      vrRow.AsString("workflow", ""),
 	}, nil
 }
 
 // CreateVReplication returns a statement to populate the first value into
 // the _vt.vreplication table.
-func CreateVReplication(workflow string, source *binlogdatapb.BinlogSource, position string, maxTPS, maxReplicationLag, timeUpdated int64, dbName string) string {
+func CreateVReplication(workflow string, source *binlogdatapb.BinlogSource, position string, maxTPS, maxReplicationLag, timeUpdated int64, dbName string,
+	workflowType binlogdatapb.VReplicationWorkflowType) string {
 	return fmt.Sprintf("insert into _vt.vreplication "+
-		"(workflow, source, pos, max_tps, max_replication_lag, time_updated, transaction_timestamp, state, db_name) "+
-		"values (%v, %v, %v, %v, %v, %v, 0, '%v', %v)",
-		encodeString(workflow), encodeString(source.String()), encodeString(position), maxTPS, maxReplicationLag, timeUpdated, BlpRunning, encodeString(dbName))
+		"(workflow, source, pos, max_tps, max_replication_lag, time_updated, transaction_timestamp, state, db_name, workflow_type) "+
+		"values (%v, %v, %v, %v, %v, %v, 0, '%v', %v, %v)",
+		encodeString(workflow), encodeString(source.String()), encodeString(position), maxTPS, maxReplicationLag,
+		timeUpdated, BlpRunning, encodeString(dbName), int64(workflowType))
 }
 
 // CreateVReplicationState returns a statement to create a stopped vreplication.
-func CreateVReplicationState(workflow string, source *binlogdatapb.BinlogSource, position, state string, dbName string) string {
+func CreateVReplicationState(workflow string, source *binlogdatapb.BinlogSource, position, state string, dbName string,
+	workflowType binlogdatapb.VReplicationWorkflowType) string {
 	return fmt.Sprintf("insert into _vt.vreplication "+
-		"(workflow, source, pos, max_tps, max_replication_lag, time_updated, transaction_timestamp, state, db_name) "+
-		"values (%v, %v, %v, %v, %v, %v, 0, '%v', %v)",
-		encodeString(workflow), encodeString(source.String()), encodeString(position), throttler.MaxRateModuleDisabled, throttler.ReplicationLagModuleDisabled, time.Now().Unix(), state, encodeString(dbName))
+		"(workflow, source, pos, max_tps, max_replication_lag, time_updated, transaction_timestamp, state, db_name, workflow_type) "+
+		"values (%v, %v, %v, %v, %v, %v, 0, '%v', %v, %v)",
+		encodeString(workflow), encodeString(source.String()), encodeString(position), throttler.MaxRateModuleDisabled,
+		throttler.ReplicationLagModuleDisabled, time.Now().Unix(), state, encodeString(dbName), int64(workflowType))
 }
 
 // GenerateUpdatePos returns a statement to update a value in the

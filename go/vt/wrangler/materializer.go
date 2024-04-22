@@ -1088,7 +1088,8 @@ func (mz *materializer) generateInserts(ctx context.Context) (string, error) {
 
 			bls.Filter.Rules = append(bls.Filter.Rules, rule)
 		}
-		ig.AddRow(mz.ms.Workflow, bls, "", mz.ms.Cell, mz.ms.TabletTypes)
+		ig.AddRow(mz.ms.Workflow, bls, "", mz.ms.Cell, mz.ms.TabletTypes,
+			int64(mz.ms.MaterializationIntent))
 	}
 	return ig.String(), nil
 }

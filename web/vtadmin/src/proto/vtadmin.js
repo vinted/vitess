@@ -83227,6 +83227,28 @@ $root.binlogdata = (function() {
         return values;
     })();
 
+    /**
+     * VReplicationWorkflowType enum.
+     * @name binlogdata.VReplicationWorkflowType
+     * @enum {number}
+     * @property {number} Materialize=0 Materialize value
+     * @property {number} MoveTables=1 MoveTables value
+     * @property {number} CreateLookupIndex=2 CreateLookupIndex value
+     * @property {number} Migrate=3 Migrate value
+     * @property {number} Reshard=4 Reshard value
+     * @property {number} OnlineDDL=5 OnlineDDL value
+     */
+    binlogdata.VReplicationWorkflowType = (function() {
+        var valuesById = {}, values = Object.create(valuesById);
+        values[valuesById[0] = "Materialize"] = 0;
+        values[valuesById[1] = "MoveTables"] = 1;
+        values[valuesById[2] = "CreateLookupIndex"] = 2;
+        values[valuesById[3] = "Migrate"] = 3;
+        values[valuesById[4] = "Reshard"] = 4;
+        values[valuesById[5] = "OnlineDDL"] = 5;
+        return values;
+    })();
+
     binlogdata.BinlogSource = (function() {
 
         /**

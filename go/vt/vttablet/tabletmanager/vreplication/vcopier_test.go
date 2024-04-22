@@ -99,7 +99,7 @@ func TestPlayerCopyCharPK(t *testing.T) {
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
 
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -200,7 +200,7 @@ func TestPlayerCopyVarcharPKCaseInsensitive(t *testing.T) {
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
 
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -304,7 +304,7 @@ func TestPlayerCopyVarcharCompositePKCaseSensitiveCollation(t *testing.T) {
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
 
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -378,7 +378,7 @@ func TestPlayerCopyTablesWithFK(t *testing.T) {
 		Filter:   filter,
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	require.NoError(t, err)
 
@@ -476,7 +476,7 @@ func TestPlayerCopyTables(t *testing.T) {
 		Filter:   filter,
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -611,7 +611,7 @@ func TestPlayerCopyBigTable(t *testing.T) {
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
 
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -726,7 +726,7 @@ func TestPlayerCopyWildcardRule(t *testing.T) {
 		Filter:   filter,
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -843,7 +843,7 @@ func TestPlayerCopyTableContinuation(t *testing.T) {
 		Filter:   filter,
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.BlpStopped, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.BlpStopped, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -962,7 +962,7 @@ func TestPlayerCopyWildcardTableContinuation(t *testing.T) {
 		Filter:   filter,
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.BlpStopped, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.BlpStopped, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -1049,7 +1049,7 @@ func TestPlayerCopyWildcardTableContinuationWithOptimizeInserts(t *testing.T) {
 		Filter:   filter,
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.BlpStopped, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.BlpStopped, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -1114,7 +1114,7 @@ func TestPlayerCopyTablesNone(t *testing.T) {
 		Filter:   filter,
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -1164,7 +1164,7 @@ func TestPlayerCopyTablesStopAfterCopy(t *testing.T) {
 		OnDdl:         binlogdatapb.OnDDLAction_IGNORE,
 		StopAfterCopy: true,
 	}
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -1240,7 +1240,7 @@ func TestPlayerCopyTableCancel(t *testing.T) {
 		Filter:   filter,
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)
@@ -1322,7 +1322,7 @@ func TestPlayerCopyTablesWithGeneratedColumn(t *testing.T) {
 		Filter:   filter,
 		OnDdl:    binlogdatapb.OnDDLAction_IGNORE,
 	}
-	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName)
+	query := binlogplayer.CreateVReplicationState("test", bls, "", binlogplayer.VReplicationInit, playerEngine.dbName, 0)
 	qr, err := playerEngine.Exec(query)
 	if err != nil {
 		t.Fatal(err)

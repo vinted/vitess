@@ -264,7 +264,7 @@ func TestSavepointInTx(t *testing.T) {
 	assertMatches(t, conn, "select id1 from t1 order by id1", `[[INT64(1)] [INT64(2)]]`)
 	exec(t, conn, "use `ks:80-`")
 	assertMatches(t, conn, "select id1 from t1 order by id1", `[[INT64(4)]]`)
-	exec(t, conn, "use")
+	exec(t, conn, "use ks")
 	assertMatches(t, conn, "select id1 from t1 order by id1", `[[INT64(1)] [INT64(2)] [INT64(4)]]`)
 
 	_, err = conn.ExecuteFetch("rollback work to savepoint a", 1000, true)
