@@ -438,7 +438,8 @@ func (scw *LegacySplitCloneWorker) findTargets(ctx context.Context) error {
 }
 
 // copy phase:
-//	- copy the data from source tablets to destination masters (with replication on)
+//   - copy the data from source tablets to destination masters (with replication on)
+//
 // Assumes that the schema has already been created on each destination tablet
 // (probably from vtctl's CopySchemaShard)
 func (scw *LegacySplitCloneWorker) copy(ctx context.Context) error {
@@ -630,7 +631,7 @@ func (scw *LegacySplitCloneWorker) copy(ctx context.Context) error {
 					Shard:    src.ShardName(),
 					KeyRange: kr,
 				}
-				qr, err := exc.vreplicationExec(ctx, binlogplayer.CreateVReplication("LegacySplitClone", bls, sourcePositions[shardIndex], scw.maxTPS, throttler.ReplicationLagModuleDisabled, time.Now().Unix(), dbName))
+				qr, err := exc.vreplicationExec(ctx, binlogplayer.CreateVReplication("LegacySplitClone", bls, sourcePositions[shardIndex], scw.maxTPS, throttler.ReplicationLagModuleDisabled, time.Now().Unix(), dbName, binlogdatapb.VReplicationWorkflowType_Reshard))
 				if err != nil {
 					processError("vreplication queries failed: %v", err)
 					break
