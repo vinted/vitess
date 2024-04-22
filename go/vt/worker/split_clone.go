@@ -1141,7 +1141,8 @@ func (scw *SplitCloneWorker) startCloningData(ctx context.Context, state StatusW
 }
 
 // copy phase:
-//	- copy the data from source tablets to destination masters (with replication on)
+//   - copy the data from source tablets to destination masters (with replication on)
+//
 // Assumes that the schema has already been created on each destination tablet
 // (probably from vtctl's CopySchemaShard)
 func (scw *SplitCloneWorker) clone(ctx context.Context, state StatusWorkerState) error {
@@ -1289,7 +1290,7 @@ func (scw *SplitCloneWorker) setUpVReplication(ctx context.Context) error {
 					bls.Tables = scw.tables
 				}
 				// TODO(mberlin): Fill in scw.maxReplicationLag once the adapative throttler is enabled by default.
-				qr, err := exc.vreplicationExec(cancelableCtx, binlogplayer.CreateVReplication("SplitClone", bls, sourcePositions[shardIndex], scw.maxTPS, throttler.ReplicationLagModuleDisabled, time.Now().Unix(), dbName))
+				qr, err := exc.vreplicationExec(cancelableCtx, binlogplayer.CreateVReplication("SplitClone", bls, sourcePositions[shardIndex], scw.maxTPS, throttler.ReplicationLagModuleDisabled, time.Now().Unix(), dbName, binlogdatapb.VReplicationWorkflowType_Reshard))
 				if err != nil {
 					handleError(vterrors.Wrap(err, "vreplication queries failed"))
 					cancel()

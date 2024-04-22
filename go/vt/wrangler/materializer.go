@@ -1101,8 +1101,17 @@ func (mz *materializer) generateInserts(ctx context.Context, targetShard *topo.S
 
 			bls.Filter.Rules = append(bls.Filter.Rules, rule)
 		}
+		var workflowType binlogdatapb.VReplicationWorkflowType
+		switch mz.ms.MaterializationIntent {
+		case vtctldatapb.MaterializationIntent_CUSTOM:
+			workflowType = binlogdatapb.VReplicationWorkflowType_Materialize
+		case vtctldatapb.MaterializationIntent_MOVETABLES:
+			workflowType = binlogdatapb.VReplicationWorkflowType_MoveTables
+		case vtctldatapb.MaterializationIntent_CREATELOOKUPINDEX:
+			workflowType = binlogdatapb.VReplicationWorkflowType_CreateLookupIndex
+		}
 		ig.AddRow(mz.ms.Workflow, bls, "", mz.ms.Cell, mz.ms.TabletTypes,
-			int64(mz.ms.MaterializationIntent))
+			workflowType)
 	}
 	return ig.String(), nil
 }

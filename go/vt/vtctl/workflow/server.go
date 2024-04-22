@@ -289,7 +289,8 @@ func (s *Server) GetWorkflows(ctx context.Context, req *vtctldatapb.GetWorkflows
 			db_name,
 			time_updated,
 			transaction_timestamp,
-			message
+			message,
+			workflow_type
 		FROM
 			_vt.vreplication
 		%s`,
@@ -317,7 +318,7 @@ func (s *Server) GetWorkflows(ctx context.Context, req *vtctldatapb.GetWorkflows
 	// - sourceShardsByWorkflow[workflow.Name] != nil
 	// - targetShardsByWorkflow[workflow.Name] != nil
 	// - workflow.ShardStatuses != nil
-	scanWorkflow := func(ctx context.Context, workflow *vtctldatapb.Workflow, row []sqltypes.Value, tablet *topo.TabletInfo) error {
+	scanWorkflow := func(ctx context.Context, workflow *vtctldatapb.Workflow, row sqltypes.RowNamedValues, tablet *topo.TabletInfo) error {
 		span, ctx := trace.NewSpan(ctx, "workflow.Server.scanWorkflow")
 		defer span.Finish()
 
@@ -327,33 +328,33 @@ func (s *Server) GetWorkflows(ctx context.Context, req *vtctldatapb.GetWorkflows
 		span.Annotate("workflow", workflow.Name)
 		span.Annotate("tablet_alias", tablet.AliasString())
 
-		id, err := evalengine.ToInt64(row[0])
+		id, err := evalengine.ToInt64(row["id"])
 		if err != nil {
 			return err
 		}
 
 		var bls binlogdatapb.BinlogSource
-		if err := prototext.Unmarshal(row[2].ToBytes(), &bls); err != nil {
+		if err := prototext.Unmarshal(row["source"].ToBytes(), &bls); err != nil {
 			return err
 		}
 
-		pos := row[3].ToString()
-		stopPos := row[4].ToString()
-		state := row[6].ToString()
-		dbName := row[7].ToString()
+		pos := row["pos"].ToString()
+		stopPos := row["stop_pos"].ToString()
+		state := row["state"].ToString()
+		dbName := row["db_name"].ToString()
 
-		timeUpdatedSeconds, err := evalengine.ToInt64(row[8])
+		timeUpdatedSeconds, err := evalengine.ToInt64(row["time_updated"])
 		if err != nil {
 			return err
 		}
 
-		transactionTimeSeconds, err := evalengine.ToInt64(row[9])
+		transactionTimeSeconds, err := evalengine.ToInt64(row["transaction_timestamp"])
 		if err != nil {
 			return err
 		}
 
-		message := row[10].ToString()
-
+		message := row["message"].ToString()
+		workflowType, _ := row["workflow_type"].ToInt32()
 		stream := &vtctldatapb.Workflow_Stream{
 			Id:           id,
 			Shard:        tablet.Shard,
@@ -371,6 +372,7 @@ func (s *Server) GetWorkflows(ctx context.Context, req *vtctldatapb.GetWorkflows
 			},
 			Message: message,
 		}
+		workflow.WorkflowType = binlogdatapb.VReplicationWorkflowType_name[workflowType]
 
 		stream.CopyStates, err = s.getWorkflowCopyStates(ctx, tablet, id)
 		if err != nil {
@@ -466,8 +468,8 @@ func (s *Server) GetWorkflows(ctx context.Context, req *vtctldatapb.GetWorkflows
 		// to a workflow we're already aggregating, or if it's a workflow we
 		// haven't seen yet for that shard primary. We use the workflow name to
 		// dedupe for this.
-		for _, row := range qr.Rows {
-			workflowName := row[1].ToString()
+		for _, row := range qr.Named().Rows {
+			workflowName := row["workflow"].ToString()
 			workflow, ok := workflowsMap[workflowName]
 			if !ok {
 				workflow = &vtctldatapb.Workflow{
@@ -481,7 +483,7 @@ func (s *Server) GetWorkflows(ctx context.Context, req *vtctldatapb.GetWorkflows
 			}
 
 			scanWorkflowWg.Add(1)
-			go func(ctx context.Context, workflow *vtctldatapb.Workflow, row []sqltypes.Value, tablet *topo.TabletInfo) {
+			go func(ctx context.Context, workflow *vtctldatapb.Workflow, row sqltypes.RowNamedValues, tablet *topo.TabletInfo) {
 				defer scanWorkflowWg.Done()
 				if err := scanWorkflow(ctx, workflow, row, tablet); err != nil {
 					scanWorkflowErrors.RecordError(err)

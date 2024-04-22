@@ -640,9 +640,10 @@ func (vre *Engine) transitionJournal(je *journalEvent) {
 		bls := proto.Clone(vre.controllers[refid].source).(*binlogdatapb.BinlogSource)
 		bls.Keyspace, bls.Shard = sgtid.Keyspace, sgtid.Shard
 
-		workflowType, _ := strconv.ParseInt(params["workflow_type"], 10, 64)
+		workflowType, _ := strconv.ParseInt(params["workflow_type"], 10, 32)
 		ig := NewInsertGenerator(binlogplayer.BlpRunning, vre.dbName)
-		ig.AddRow(params["workflow"], bls, sgtid.Gtid, params["cell"], params["tablet_types"], workflowType)
+		ig.AddRow(params["workflow"], bls, sgtid.Gtid, params["cell"], params["tablet_types"],
+			binlogdatapb.VReplicationWorkflowType(workflowType))
 		qr, err := withDDL.Exec(vre.ctx, ig.String(), dbClient.ExecuteFetch)
 		if err != nil {
 			log.Errorf("transitionJournal: %v", err)

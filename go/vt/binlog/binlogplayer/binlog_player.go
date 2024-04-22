@@ -577,7 +577,7 @@ type VRSettings struct {
 	MaxTPS            int64
 	MaxReplicationLag int64
 	State             string
-	WorkflowType      int32
+	WorkflowType      binlogdatapb.VReplicationWorkflowType
 	WorkflowName      string
 }
 
@@ -611,11 +611,10 @@ func ReadVRSettings(dbClient DBClient, uid uint32) (VRSettings, error) {
 	if err != nil {
 		return VRSettings{}, fmt.Errorf("failed to parse stop_pos column: %v", err)
 	}
-	workflowTypeTmp, err := vrRow.ToInt64("workflow_type")
+	workflowType, err := vrRow.ToInt32("workflow_type")
 	if err != nil {
 		return VRSettings{}, fmt.Errorf("failed to parse workflow_type column: %v", err)
 	}
-	workflowType := int32(workflowTypeTmp)
 
 	return VRSettings{
 		StartPos:          startPos,
@@ -623,7 +622,7 @@ func ReadVRSettings(dbClient DBClient, uid uint32) (VRSettings, error) {
 		MaxTPS:            maxTPS,
 		MaxReplicationLag: maxReplicationLag,
 		State:             vrRow.AsString("state", ""),
-		WorkflowType:      workflowType,
+		WorkflowType:      binlogdatapb.VReplicationWorkflowType(workflowType),
 		WorkflowName:      vrRow.AsString("workflow", ""),
 	}, nil
 }
@@ -634,9 +633,9 @@ func CreateVReplication(workflow string, source *binlogdatapb.BinlogSource, posi
 	workflowType binlogdatapb.VReplicationWorkflowType) string {
 	return fmt.Sprintf("insert into _vt.vreplication "+
 		"(workflow, source, pos, max_tps, max_replication_lag, time_updated, transaction_timestamp, state, db_name, workflow_type) "+
-		"values (%v, %v, %v, %v, %v, %v, 0, '%v', %v, %v)",
+		"values (%v, %v, %v, %v, %v, %v, 0, '%v', %v, %d)",
 		encodeString(workflow), encodeString(source.String()), encodeString(position), maxTPS, maxReplicationLag,
-		timeUpdated, BlpRunning, encodeString(dbName), int64(workflowType))
+		timeUpdated, BlpRunning, encodeString(dbName), workflowType)
 }
 
 // CreateVReplicationState returns a statement to create a stopped vreplication.
@@ -644,9 +643,9 @@ func CreateVReplicationState(workflow string, source *binlogdatapb.BinlogSource,
 	workflowType binlogdatapb.VReplicationWorkflowType) string {
 	return fmt.Sprintf("insert into _vt.vreplication "+
 		"(workflow, source, pos, max_tps, max_replication_lag, time_updated, transaction_timestamp, state, db_name, workflow_type) "+
-		"values (%v, %v, %v, %v, %v, %v, 0, '%v', %v, %v)",
+		"values (%v, %v, %v, %v, %v, %v, 0, '%v', %v, %d)",
 		encodeString(workflow), encodeString(source.String()), encodeString(position), throttler.MaxRateModuleDisabled,
-		throttler.ReplicationLagModuleDisabled, time.Now().Unix(), state, encodeString(dbName), int64(workflowType))
+		throttler.ReplicationLagModuleDisabled, time.Now().Unix(), state, encodeString(dbName), workflowType)
 }
 
 // GenerateUpdatePos returns a statement to update a value in the

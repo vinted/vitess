@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -395,7 +396,7 @@ func (wr *Wrangler) getReplicationStatusFromRow(ctx context.Context, row []sqlty
 	var err error
 	var id, timeUpdated, transactionTimestamp int64
 	var state, dbName, pos, stopPos, message string
-	var workflowType int64
+	var workflowType int32
 	var bls binlogdatapb.BinlogSource
 	var mpos mysql.Position
 
@@ -428,10 +429,11 @@ func (wr *Wrangler) getReplicationStatusFromRow(ctx context.Context, row []sqlty
 		return nil, "", err
 	}
 	message = row[9].ToString()
-	workflowType, err = evalengine.ToInt64(row[10])
+	workflowTypeTmp, err := strconv.ParseInt(row[10].RawStr(), 10, 32)
 	if err != nil {
 		return nil, "", err
 	}
+	workflowType = int32(workflowTypeTmp)
 	status := &ReplicationStatus{
 		Shard:                master.Shard,
 		Tablet:               master.AliasString(),
@@ -444,7 +446,7 @@ func (wr *Wrangler) getReplicationStatusFromRow(ctx context.Context, row []sqlty
 		TransactionTimestamp: transactionTimestamp,
 		TimeUpdated:          timeUpdated,
 		Message:              message,
-		WorkflowType:         binlogdatapb.VReplicationWorkflowType_name[int32(workflowType)],
+		WorkflowType:         binlogdatapb.VReplicationWorkflowType_name[workflowType],
 	}
 	status.CopyState, err = wr.getCopyState(ctx, master, id)
 	if err != nil {

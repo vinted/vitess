@@ -526,7 +526,7 @@ func (v *VRepl) analyze(ctx context.Context, conn *dbconnpool.DBConnection) erro
 func (v *VRepl) generateInsertStatement(ctx context.Context) (string, error) {
 	ig := vreplication.NewInsertGenerator(binlogplayer.BlpStopped, v.dbName)
 	ig.AddRow(v.workflow, v.bls, v.pos, "", "in_order:REPLICA,MASTER",
-		int64(binlogdatapb.VReplicationWorkflowType_OnlineDDL))
+		binlogdatapb.VReplicationWorkflowType_OnlineDDL)
 
 	return ig.String(), nil
 }

@@ -226,7 +226,7 @@ func (sm *StreamMigrator) readTabletStreams(ctx context.Context, ti *topo.Tablet
 				ti.Keyspace, ti.Shard, id)
 		}
 
-		workflowType, err := row["workflow_type"].ToInt64()
+		workflowType, err := row["workflow_type"].ToInt32()
 		if err != nil {
 			return nil, err
 		}
@@ -566,7 +566,7 @@ func (sm *StreamMigrator) createTargetStreams(ctx context.Context, tmpl []*VRepl
 			}
 
 			ig.AddRow(vrs.Workflow, vrs.BinlogSource, mysql.EncodePosition(vrs.Position), "", "",
-				int64(vrs.WorkflowType))
+				vrs.WorkflowType)
 		}
 
 		_, err := sm.ts.VReplicationExec(ctx, target.GetPrimary().GetAlias(), ig.String())

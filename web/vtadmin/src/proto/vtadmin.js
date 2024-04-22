@@ -60575,6 +60575,7 @@ $root.vtctldata = (function() {
          * @property {vtctldata.Workflow.IReplicationLocation|null} [target] Workflow target
          * @property {number|Long|null} [max_v_replication_lag] Workflow max_v_replication_lag
          * @property {Object.<string,vtctldata.Workflow.IShardStream>|null} [shard_streams] Workflow shard_streams
+         * @property {string|null} [workflow_type] Workflow workflow_type
          */
 
         /**
@@ -60632,6 +60633,14 @@ $root.vtctldata = (function() {
          * @instance
          */
         Workflow.prototype.shard_streams = $util.emptyObject;
+
+        /**
+         * Workflow workflow_type.
+         * @member {string} workflow_type
+         * @memberof vtctldata.Workflow
+         * @instance
+         */
+        Workflow.prototype.workflow_type = "";
 
         /**
          * Creates a new Workflow instance using the specified properties.

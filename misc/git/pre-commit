@@ -16,5 +16,5 @@ if [ -z "$GOPATH" ]; then
 fi
 
 for hook in $GIT_DIR/../misc/git/hooks/*; do
-  $hook
+  echo $hook
 done
