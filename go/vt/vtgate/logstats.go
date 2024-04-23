@@ -69,7 +69,7 @@ func NewLogStats(ctx context.Context, methodName, sql, sessionUUID string, bindV
 // Send finalizes a record and sends it
 func (stats *LogStats) Send() {
 	stats.EndTime = time.Now()
-	// QueryLogger.Send(stats)
+	QueryLogger.Send(stats)
 }
 
 // Context returns the context used by LogStats.
