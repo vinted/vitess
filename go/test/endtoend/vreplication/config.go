@@ -34,6 +34,33 @@ create table tenant(tenant_id binary(16), name varbinary(16), primary key (tenan
   }
 }
 `
+
+	createLookupVindexVSchema = `
+{
+  "sharded": true,
+  "vindexes": {
+    "customer_name_keyspace_id": {
+      "type": "consistent_lookup",
+      "params": {
+        "table": "product.customer_name_keyspace_id",
+        "from": "name,cid",
+        "to": "keyspace_id",
+        "ignore_nulls": "true"
+      },
+      "owner": "customer"
+    }
+  },
+  "tables": {
+    "customer": {
+      "column_vindexes": [{
+        "columns": ["name", "cid"],
+        "name": "customer_name_keyspace_id"
+      }]
+    }
+  }
+}
+`
+
 	customerSchema  = ""
 	customerVSchema = `
 {

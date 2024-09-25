@@ -10,18 +10,26 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"vitess.io/vitess/go/json2"
 	"vitess.io/vitess/go/vt/log"
 
 	"github.com/buger/jsonparser"
 	"github.com/stretchr/testify/require"
 
 	"vitess.io/vitess/go/test/endtoend/cluster"
+	"vitess.io/vitess/go/vt/binlog/binlogplayer"
 
 	"github.com/PuerkitoBio/goquery"
 
 	"vitess.io/vitess/go/mysql"
 	"vitess.io/vitess/go/sqltypes"
+	"vitess.io/vitess/go/vt/wrangler"
+)
+
+const (
+	workflowStateTimeout = 90 * time.Second
 )
 
 func execMultipleQueries(t *testing.T, conn *mysql.Conn, database string, lines string) {
@@ -71,6 +79,50 @@ func checkHealth(t *testing.T, url string) bool {
 		return false
 	}
 	return true
+}
+
+// waitForWorkflowState waits for all of the given workflow's
+// streams to reach the provided state.
+func waitForWorkflowState(t *testing.T, vc *VitessCluster, ksWorkflow string, wantState string) {
+	done := false
+	timer := time.NewTimer(workflowStateTimeout)
+	log.Infof("Waiting for workflow %q to fully reach %q state", ksWorkflow, wantState)
+	for {
+		output, err := vc.VtctlClient.ExecuteCommandWithOutput("Workflow", ksWorkflow, "show")
+		require.NoError(t, err, output)
+
+		var rsr wrangler.ReplicationStatusResult
+		err = json2.Unmarshal([]byte(output), rsr)
+		require.Nil(t, err)
+
+		done = true
+		for ksShard := range rsr.ShardStatuses { // for each participating tablet
+			for _, tabletStreams := range rsr.ShardStatuses[ksShard].MasterReplicationStatuses { // for each stream
+				// we need to wait for all streams to have the desired state
+				if tabletStreams.State == wantState {
+					if wantState == binlogplayer.BlpRunning && tabletStreams.Pos == "" {
+						done = false
+					}
+				} else {
+					done = false
+				}
+
+			}
+
+		}
+		if done {
+			log.Infof("Workflow %q has fully reached the desired state of %q", ksWorkflow, wantState)
+			return
+		}
+		select {
+		case <-timer.C:
+			require.FailNowf(t, "workflow state not reached",
+				"Workflow %q did not fully reach the expected state of %q before the timeout of %s; last seen output: %s",
+				ksWorkflow, wantState, workflowStateTimeout, output)
+		default:
+			time.Sleep(defaultTick)
+		}
+	}
 }
 
 func validateCount(t *testing.T, conn *mysql.Conn, database string, table string, want int) {
