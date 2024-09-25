@@ -33,12 +33,6 @@ import (
 	"vitess.io/vitess/go/vt/vtgate/vtgateconn"
 )
 
-// BACKPORT: Required for test to work https://github.com/vitessio/vitess/commit/8037f43d00934e9420e657859021dc0245aa35b8
-const (
-	defaultTick    = 1 * time.Second
-	defaultTimeout = 30 * time.Second
-)
-
 // TestVSchemaChangesUnderLoad tests vstreamer under a load of high binlog events and simultaneous multiple vschema changes
 // see https://github.com/vitessio/vitess/issues/11169
 func TestVSchemaChangesUnderLoad(t *testing.T) {

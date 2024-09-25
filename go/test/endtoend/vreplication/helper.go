@@ -28,7 +28,10 @@ import (
 	"vitess.io/vitess/go/vt/wrangler"
 )
 
+// BACKPORT: Required for test to work https://github.com/vitessio/vitess/commit/8037f43d00934e9420e657859021dc0245aa35b8
 const (
+	defaultTimeout       = 30 * time.Second
+	defaultTick          = 1 * time.Second
 	workflowStateTimeout = 90 * time.Second
 )
 
