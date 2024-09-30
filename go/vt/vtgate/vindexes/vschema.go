@@ -624,8 +624,6 @@ func ChooseVindexForType(typ querypb.Type) (string, error) {
 		return "xxhash", nil
 	case sqltypes.IsText(typ):
 		return "unicode_loose_xxhash", nil
-	case sqltypes.IsBinary(typ):
-		return "binary_md5", nil
 	}
 	return "", fmt.Errorf("type %v is not recommended for a vindex", typ)
 }
