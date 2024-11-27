@@ -43,6 +43,7 @@ import (
 	"vitess.io/vitess/go/vt/vterrors"
 	"vitess.io/vitess/go/vt/vttablet/tabletserver/planbuilder"
 	"vitess.io/vitess/go/vt/vttablet/tabletserver/rules"
+	"vitess.io/vitess/go/vt/vttablet/tabletserver/schema"
 	"vitess.io/vitess/go/vt/vttablet/tabletserver/tabletenv"
 
 	querypb "vitess.io/vitess/go/vt/proto/query"
@@ -654,6 +655,66 @@ func TestQueryExecutorPlanNextval(t *testing.T) {
 	}
 }
 
+func compareSnowflake(t *testing.T, got *sqltypes.Result, wantTimestamp, wantMachineID, wantSequence int64) {
+	wantFields := []*querypb.Field{{
+		Name: "nextval",
+		Type: sqltypes.Int64,
+	}}
+	assert.Equal(t, wantFields, got.Fields)
+	id, _ := got.Rows[0][0].ToInt64()
+	gotTimestamp := (id >> int64(schema.SequenceLength+schema.MachineIDLength)) + schema.SnowflakeStartTime.UTC().UnixNano()/1e6
+	gotSequence := id & int64(schema.MaxSequence)
+	gotMachineID := (id & (int64(schema.MaxMachineID) << schema.SequenceLength)) >> schema.SequenceLength
+	fmt.Println(gotTimestamp, gotSequence, gotMachineID)
+	assert.Equal(t, wantSequence, gotSequence)
+	assert.Equal(t, wantMachineID, gotMachineID)
+	// this is a flaky test
+	assert.Equal(t, wantTimestamp, gotTimestamp)
+
+}
+func TestQueryExecutorSnowflakePlanNextval(t *testing.T) {
+	db := setUpQueryExecutorTest(t)
+	defer db.Close()
+	selQuery := "select machine_id from snow where id = 0"
+	db.AddQuery(selQuery, &sqltypes.Result{
+		Fields: []*querypb.Field{
+			{Type: sqltypes.Int64},
+		},
+		Rows: [][]sqltypes.Value{{
+			sqltypes.NewInt64(1),
+		}},
+	})
+	ctx := context.Background()
+	tsv := newTestTabletServer(ctx, noFlags, db)
+	defer tsv.StopService()
+
+	// test single value
+	qre := newTestQueryExecutor(ctx, tsv, "select next value from snow", 0)
+	assert.Equal(t, planbuilder.PlanNextval, qre.plan.PlanID)
+	currentMS := currentMillis()
+	got, err := qre.Execute()
+	if err != nil {
+		t.Fatalf("qre.Execute() = %v, want nil", err)
+	}
+	compareSnowflake(t, got, currentMS, 1, 0)
+
+	// test overflow with multiple values
+	currentMS = currentMillis()
+	qre = newTestQueryExecutor(ctx, tsv, "select next 5000 values from snow", 0)
+	assert.Equal(t, planbuilder.PlanNextval, qre.plan.PlanID)
+	got, err = qre.Execute()
+	if err != nil {
+		t.Fatalf("qre.Execute() = %v, want nil", err)
+	}
+	compareSnowflake(t, got, currentMS, 1, 1)
+	got, err = qre.Execute()
+	if err != nil {
+		t.Fatalf("qre.Execute() = %v, want nil", err)
+	}
+	compareSnowflake(t, got, currentMS+1, 1, 906)
+
+}
+
 func TestQueryExecutorMessageStreamACL(t *testing.T) {
 	aclName := fmt.Sprintf("simpleacl-test-%d", rand.Int63())
 	tableacl.Register(aclName, &simpleacl.Factory{})
@@ -1204,6 +1265,7 @@ func initQueryExecutorTestDB(db *fakesqldb.DB) {
 		Rows: [][]sqltypes.Value{
 			mysql.BaseShowTablesRow("test_table", false, ""),
 			mysql.BaseShowTablesRow("seq", false, "vitess_sequence"),
+			mysql.BaseShowTablesRow("snow", false, "vitess_snowflake"),
 			mysql.BaseShowTablesRow("msg", false, "vitess_message,vt_ack_wait=30,vt_purge_after=120,vt_batch_size=1,vt_cache_size=10,vt_poller_interval=30"),
 		},
 	})
@@ -1297,6 +1359,7 @@ func getQueryExecutorSupportedQueries() map[string]*sqltypes.Result {
 			Rows: [][]sqltypes.Value{
 				mysql.ShowPrimaryRow("test_table", "pk"),
 				mysql.ShowPrimaryRow("seq", "id"),
+				mysql.ShowPrimaryRow("snow", "id"),
 				mysql.ShowPrimaryRow("msg", "id"),
 			},
 		},
@@ -1324,6 +1387,15 @@ func getQueryExecutorSupportedQueries() map[string]*sqltypes.Result {
 				Type: sqltypes.Int64,
 			}, {
 				Name: "increment",
+				Type: sqltypes.Int64,
+			}},
+		},
+		"select * from snow where 1 != 1": {
+			Fields: []*querypb.Field{{
+				Name: "id",
+				Type: sqltypes.Int32,
+			}, {
+				Name: "machine_id",
 				Type: sqltypes.Int64,
 			}},
 		},

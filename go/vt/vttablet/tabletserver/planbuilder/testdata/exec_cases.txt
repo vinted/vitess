@@ -139,6 +139,52 @@
   "FullQuery": "select :bv from a where 1 != 1 limit :#maxLimit"
 }
 
+# single value snowflake
+"select next value from snow"
+{
+  "PlanID": "Nextval",
+  "TableName": "snow",
+  "Permissions": [
+    {
+      "TableName": "snow",
+      "Role": 0
+    }
+  ],
+  "NextCount": "1"
+}
+
+# snowflake with number
+"select next 10 values from snow"
+{
+  "PlanID": "Nextval",
+  "TableName": "snow",
+  "Permissions": [
+    {
+      "TableName": "snow",
+      "Role": 0
+    }
+  ],
+  "NextCount": "10"
+}
+
+# snowflake with bindvar
+"select next :a values from snow"
+{
+  "PlanID": "Nextval",
+  "TableName": "snow",
+  "Permissions": [
+    {
+      "TableName": "snow",
+      "Role": 0
+    }
+  ],
+  "NextCount": "\":a\""
+}
+
+# snowflake with bad value
+"select next 12345667852342342342323423423 values from snow"
+"strconv.ParseUint: parsing "12345667852342342342323423423": value out of range"
+
 # single value sequence
 "select next value from seq"
 {
@@ -188,11 +234,11 @@
 
 # nextval on non-sequence table
 "select next value from a"
-"a is not a sequence"
+"a is not a sequence or snowflake"
 
 # nextval on non-existent table
 "select next value from id"
-"id is not a sequence"
+"id is not a sequence or snowflake"
 
 # for update
 "select eid from a for update"

@@ -425,10 +425,10 @@ type (
 )
 
 /*
-	The greedy planner will plan a query by finding first finding the best route plan for every table.
-    Then, iteratively, it finds the cheapest join that can be produced between the remaining plans,
-	and removes the two inputs to this cheapest plan and instead adds the join.
-	As an optimization, it first only considers joining tables that have predicates defined between them
+		The greedy planner will plan a query by finding first finding the best route plan for every table.
+	    Then, iteratively, it finds the cheapest join that can be produced between the remaining plans,
+		and removes the two inputs to this cheapest plan and instead adds the join.
+		As an optimization, it first only considers joining tables that have predicates defined between them
 */
 func greedySolve(qg *abstract.QueryGraph, semTable *semantics.SemTable, vschema ContextVSchema) (joinTree, error) {
 	joinTrees, err := seedPlanList(qg, semTable, vschema)
@@ -603,6 +603,9 @@ func createRoutePlan(table *abstract.QueryTable, solves semantics.TableSet, vsch
 
 	switch {
 	case vschemaTable.Type == vindexes.TypeSequence:
+		plan.routeOpCode = engine.SelectNext
+		// TODO: Snowflake
+	case vschemaTable.Type == vindexes.TypeSnowflake:
 		plan.routeOpCode = engine.SelectNext
 	case vschemaTable.Type == vindexes.TypeReference:
 		plan.routeOpCode = engine.SelectReference

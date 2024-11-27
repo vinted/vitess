@@ -91,6 +91,13 @@ var sequenceFields = []*querypb.Field{
 	},
 }
 
+var snowflakeFields = []*querypb.Field{
+	{
+		Name: "nextval",
+		Type: sqltypes.Int64,
+	},
+}
+
 func (qre *QueryExecutor) shouldConsolidate() bool {
 	cm := qre.tsv.qe.consolidatorMode.Get()
 	return cm == tabletenv.Enable || (cm == tabletenv.NotOnMaster && qre.tabletType != topodatapb.TabletType_MASTER)
@@ -519,70 +526,115 @@ func (*QueryExecutor) BeginAgain(ctx context.Context, dc *StatefulConnection) er
 	return nil
 }
 
+// currentMillis get current millisecond.
+func currentMillis() int64 {
+	return time.Now().UTC().UnixNano() / 1e6
+}
+
 func (qre *QueryExecutor) execNextval() (*sqltypes.Result, error) {
 	inc, err := resolveNumber(qre.plan.NextCount, qre.bindVars)
 	if err != nil {
 		return nil, err
 	}
 	tableName := qre.plan.TableName()
+	// check if snowflake
+
 	if inc < 1 {
-		return nil, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "invalid increment for sequence %s: %d", tableName, inc)
+		return nil, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "invalid increment for sequence or snowflake %s: %d", tableName, inc)
 	}
 
-	t := qre.plan.Table
-	t.SequenceInfo.Lock()
-	defer t.SequenceInfo.Unlock()
-	if t.SequenceInfo.NextVal == 0 || t.SequenceInfo.NextVal+inc > t.SequenceInfo.LastVal {
-		_, err := qre.execAsTransaction(func(conn *StatefulConnection) (*sqltypes.Result, error) {
-			query := fmt.Sprintf("select next_id, cache from %s where id = 0 for update", sqlparser.String(tableName))
-			qr, err := qre.execStatefulConn(conn, query, false)
-			if err != nil {
-				return nil, err
-			}
-			if len(qr.Rows) != 1 {
-				return nil, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "unexpected rows from reading sequence %s (possible mis-route): %d", tableName, len(qr.Rows))
-			}
-			nextID, err := evalengine.ToInt64(qr.Rows[0][0])
-			if err != nil {
-				return nil, vterrors.Wrapf(err, "error loading sequence %s", tableName)
-			}
-			// If LastVal does not match next ID, then either:
-			// VTTablet just started, and we're initializing the cache, or
-			// Someone reset the id underneath us.
-			if t.SequenceInfo.LastVal != nextID {
-				if nextID < t.SequenceInfo.LastVal {
-					log.Warningf("Sequence next ID value %v is below the currently cached max %v, updating it to max", nextID, t.SequenceInfo.LastVal)
-					nextID = t.SequenceInfo.LastVal
+	var ret int64
+	if qre.plan.Table.SequenceInfo != nil {
+		t := qre.plan.Table
+		t.SequenceInfo.Lock()
+		defer t.SequenceInfo.Unlock()
+		if t.SequenceInfo.NextVal == 0 || t.SequenceInfo.NextVal+inc > t.SequenceInfo.LastVal {
+			_, err := qre.execAsTransaction(func(conn *StatefulConnection) (*sqltypes.Result, error) {
+				query := fmt.Sprintf("select next_id, cache from %s where id = 0 for update", sqlparser.String(tableName))
+				qr, err := qre.execStatefulConn(conn, query, false)
+				if err != nil {
+					return nil, err
 				}
-				t.SequenceInfo.NextVal = nextID
-				t.SequenceInfo.LastVal = nextID
-			}
-			cache, err := evalengine.ToInt64(qr.Rows[0][1])
-			if err != nil {
-				return nil, vterrors.Wrapf(err, "error loading sequence %s", tableName)
-			}
-			if cache < 1 {
-				return nil, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "invalid cache value for sequence %s: %d", tableName, cache)
-			}
-			newLast := nextID + cache
-			for newLast < t.SequenceInfo.NextVal+inc {
-				newLast += cache
-			}
-			query = fmt.Sprintf("update %s set next_id = %d where id = 0", sqlparser.String(tableName), newLast)
-			conn.TxProperties().RecordQuery(query)
-			_, err = qre.execStatefulConn(conn, query, false)
+				if len(qr.Rows) != 1 {
+					return nil, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "unexpected rows from reading sequence %s (possible mis-route): %d", tableName, len(qr.Rows))
+				}
+				nextID, err := evalengine.ToInt64(qr.Rows[0][0])
+				if err != nil {
+					return nil, vterrors.Wrapf(err, "error loading sequence %s", tableName)
+				}
+				// If LastVal does not match next ID, then either:
+				// VTTablet just started, and we're initializing the cache, or
+				// Someone reset the id underneath us.
+				if t.SequenceInfo.LastVal != nextID {
+					if nextID < t.SequenceInfo.LastVal {
+						log.Warningf("Sequence next ID value %v is below the currently cached max %v, updating it to max", nextID, t.SequenceInfo.LastVal)
+						nextID = t.SequenceInfo.LastVal
+					}
+					t.SequenceInfo.NextVal = nextID
+					t.SequenceInfo.LastVal = nextID
+				}
+				cache, err := evalengine.ToInt64(qr.Rows[0][1])
+				if err != nil {
+					return nil, vterrors.Wrapf(err, "error loading sequence %s", tableName)
+				}
+				if cache < 1 {
+					return nil, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "invalid cache value for sequence %s: %d", tableName, cache)
+				}
+				newLast := nextID + cache
+				for newLast < t.SequenceInfo.NextVal+inc {
+					newLast += cache
+				}
+				query = fmt.Sprintf("update %s set next_id = %d where id = 0", sqlparser.String(tableName), newLast)
+				conn.TxProperties().RecordQuery(query)
+				_, err = qre.execStatefulConn(conn, query, false)
+				if err != nil {
+					return nil, err
+				}
+				t.SequenceInfo.LastVal = newLast
+				return nil, nil
+			})
 			if err != nil {
 				return nil, err
 			}
-			t.SequenceInfo.LastVal = newLast
-			return nil, nil
-		})
-		if err != nil {
-			return nil, err
 		}
+		ret = t.SequenceInfo.NextVal
+		t.SequenceInfo.NextVal += inc
+
+	} else if qre.plan.Table.SnowflakeInfo != nil {
+		t := qre.plan.Table
+		t.SnowflakeInfo.Lock()
+		defer t.SnowflakeInfo.Unlock()
+
+		// if MachineID is 0, then we need to initialize snowflake
+		if t.SnowflakeInfo.MachineID == 0 {
+			_, err := qre.execAsTransaction(func(conn *StatefulConnection) (*sqltypes.Result, error) {
+				query := fmt.Sprintf("select machine_id from %s where id = 0", sqlparser.String(tableName))
+				qr, err := qre.execStatefulConn(conn, query, false)
+				if err != nil {
+					return nil, err
+				}
+				if len(qr.Rows) != 1 {
+					return nil, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "unexpected rows from reading snowflake %s (possible mis-route): %d", tableName, len(qr.Rows))
+				}
+				machineID, err := evalengine.ToInt64(qr.Rows[0][0])
+				if err != nil {
+					return nil, vterrors.Wrapf(err, "error loading sequence %s", tableName)
+				}
+				t.SnowflakeInfo.SetMachineID(machineID)
+				return nil, nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Generate new id here, return it and update last val with overflow
+		nextID, err := t.SnowflakeInfo.NextNID(inc, currentMillis())
+		if err != nil {
+			return nil, vterrors.Wrapf(err, "error generating snowflake with NextNID(%d) %s", inc, tableName)
+		}
+		ret = int64(nextID)
 	}
-	ret := t.SequenceInfo.NextVal
-	t.SequenceInfo.NextVal += inc
 	return &sqltypes.Result{
 		Fields: sequenceFields,
 		Rows: [][]sqltypes.Value{{

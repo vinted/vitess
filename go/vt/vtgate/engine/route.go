@@ -178,7 +178,7 @@ const (
 	// SelectScatter is for routing a scatter query
 	// to all shards of a keyspace.
 	SelectScatter
-	// SelectNext is for fetching from a sequence.
+	// SelectNext is for fetching from a sequence or snowflake.
 	SelectNext
 	// SelectDBA is for executing a DBA statement.
 	SelectDBA

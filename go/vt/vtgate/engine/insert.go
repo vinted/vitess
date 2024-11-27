@@ -131,6 +131,9 @@ type Generate struct {
 	// will be stored as a list within the PlanValue. New
 	// values will be generated based on how many were not
 	// supplied (NULL).
+
+	// Need to distiguish between sequence or snowflake type
+	Type   string
 	Values sqltypes.PlanValue
 }
 
@@ -289,6 +292,27 @@ func shouldGenerate(v sqltypes.Value) bool {
 	return false
 }
 
+const (
+	TimestampLength uint8 = 41
+	MachineIDLength uint8 = 10
+	SequenceLength  uint8 = 12
+	MaxSequence     int64 = 1<<SequenceLength - 1
+	MaxTimestamp    int64 = 1<<TimestampLength - 1
+	MaxMachineID    int64 = 1<<MachineIDLength - 1
+
+	machineIDMoveLength = SequenceLength
+	timestampMoveLength = MachineIDLength + SequenceLength
+)
+
+var (
+	// default starttime
+	SnowflakeStartTime = time.Date(2008, 11, 10, 23, 0, 0, 0, time.UTC)
+)
+
+func elapsedTime(noms int64, s time.Time) int64 {
+	return noms - s.UTC().UnixNano()/1e6
+}
+
 // processGenerate generates new values using a sequence if necessary.
 // If no value was generated, it returns 0. Values are generated only
 // for cases where none are supplied.
@@ -316,6 +340,7 @@ func (ins *Insert) processGenerate(vcursor VCursor, bindVars map[string]*querypb
 		if err != nil {
 			return 0, err
 		}
+		// TODO: place where to decide routing maybe for snowflake
 		if len(rss) != 1 {
 			return 0, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "auto sequence generation can happen through single shard only, it is getting routed to %d shards", len(rss))
 		}
@@ -333,6 +358,30 @@ func (ins *Insert) processGenerate(vcursor VCursor, bindVars map[string]*querypb
 	}
 
 	// Fill the holes where no value was supplied.
+	// For Snowflake
+	if ins.Generate.Type == vindexes.TypeSnowflake {
+		cur := insertID
+		ts := (cur >> int64(SequenceLength+MachineIDLength)) + SnowflakeStartTime.UTC().UnixNano()/1e6
+		sequence := cur & int64(MaxSequence)
+		machineID := (cur & (int64(MaxMachineID) << SequenceLength)) >> SequenceLength
+		for i, v := range resolved {
+			fmt.Println(fmt.Sprintf("Generating Snowflake, %s id %d", ins.GetTableName(), cur))
+			if shouldGenerate(v) {
+				bindVars[SeqVarName+strconv.Itoa(i)] = sqltypes.Int64BindVariable(cur)
+				// calculate next id and advance ts and sequence
+				totalInc := sequence + 1
+				ts := ts + totalInc/MaxSequence
+				sequence = totalInc % MaxSequence
+				// TODO: generate next id properly for snowflake
+				df := elapsedTime(ts, SnowflakeStartTime)
+				cur = int64((uint64(df) << uint64(timestampMoveLength)) | (uint64(machineID) << uint64(machineIDMoveLength)) | uint64(sequence))
+			} else {
+				bindVars[SeqVarName+strconv.Itoa(i)] = sqltypes.ValueBindVariable(v)
+			}
+		}
+		return insertID, nil
+	}
+	// For Sequence
 	cur := insertID
 	for i, v := range resolved {
 		if shouldGenerate(v) {
@@ -609,8 +658,8 @@ func (ins *Insert) processUnowned(vcursor VCursor, vindexColumnsKeys [][]sqltype
 	return nil
 }
 
-//InsertVarName returns a name for the bind var for this column. This method is used by the planner and engine,
-//to make sure they both produce the same names
+// InsertVarName returns a name for the bind var for this column. This method is used by the planner and engine,
+// to make sure they both produce the same names
 func InsertVarName(col sqlparser.ColIdent, rowNum int) string {
 	return fmt.Sprintf("_%s_%d", col.CompliantName(), rowNum)
 }

@@ -68,6 +68,7 @@ func Queries() map[string]*sqltypes.Result {
 				mysql.ShowPrimaryRow("test_table_02", "pk"),
 				mysql.ShowPrimaryRow("test_table_03", "pk"),
 				mysql.ShowPrimaryRow("seq", "id"),
+				mysql.ShowPrimaryRow("snow", "id"),
 				mysql.ShowPrimaryRow("msg", "id"),
 			},
 		},
@@ -101,6 +102,15 @@ func Queries() map[string]*sqltypes.Result {
 				Type: sqltypes.Int64,
 			}, {
 				Name: "increment",
+				Type: sqltypes.Int64,
+			}},
+		},
+		"select * from snow where 1 != 1": {
+			Fields: []*querypb.Field{{
+				Name: "id",
+				Type: sqltypes.Int32,
+			}, {
+				Name: "machine_id",
 				Type: sqltypes.Int64,
 			}},
 		},

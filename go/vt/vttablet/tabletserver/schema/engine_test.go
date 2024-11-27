@@ -63,6 +63,7 @@ func TestOpenAndReload(t *testing.T) {
 				mysql.BaseShowTablesRow("test_table_02", false, ""),
 				mysql.BaseShowTablesRow("test_table_03", false, ""),
 				mysql.BaseShowTablesRow("seq", false, "vitess_sequence"),
+				mysql.BaseShowTablesRow("snow", false, "vitess_snowflake"),
 				mysql.BaseShowTablesRow("msg", false, "vitess_message,vt_ack_wait=30,vt_purge_after=120,vt_batch_size=1,vt_cache_size=10,vt_poller_interval=30"),
 			},
 			SessionStateChanges: "",
@@ -114,6 +115,7 @@ func TestOpenAndReload(t *testing.T) {
 			// test_table_04 will in spite of older timestamp because it doesn't exist yet.
 			mysql.BaseShowTablesRow("test_table_04", false, ""),
 			mysql.BaseShowTablesRow("seq", false, "vitess_sequence"),
+			mysql.BaseShowTablesRow("snow", false, "vitess_snowflake"),
 		},
 	})
 	db.AddQuery("select * from test_table_03 where 1 != 1", &sqltypes.Result{
@@ -143,6 +145,7 @@ func TestOpenAndReload(t *testing.T) {
 			mysql.ShowPrimaryRow("test_table_03", "pk2"),
 			mysql.ShowPrimaryRow("test_table_04", "pk"),
 			mysql.ShowPrimaryRow("seq", "id"),
+			mysql.ShowPrimaryRow("snow", "id"),
 		},
 	})
 	secondReadRowsValue := 123
@@ -153,7 +156,7 @@ func TestOpenAndReload(t *testing.T) {
 		if firstTime {
 			firstTime = false
 			sort.Strings(created)
-			assert.Equal(t, []string{"dual", "msg", "seq", "test_table_01", "test_table_02", "test_table_03"}, created)
+			assert.Equal(t, []string{"dual", "msg", "seq", "snow", "test_table_01", "test_table_02", "test_table_03"}, created)
 			assert.Equal(t, []string(nil), altered)
 			assert.Equal(t, []string(nil), dropped)
 		} else {
@@ -225,6 +228,7 @@ func TestOpenAndReload(t *testing.T) {
 			mysql.BaseShowTablesRow("test_table_02", false, ""),
 			mysql.BaseShowTablesRow("test_table_04", false, ""),
 			mysql.BaseShowTablesRow("seq", false, "vitess_sequence"),
+			mysql.BaseShowTablesRow("snow", false, "vitess_snowflake"),
 		},
 	})
 	db.AddQuery(mysql.BaseShowPrimary, &sqltypes.Result{
@@ -234,6 +238,7 @@ func TestOpenAndReload(t *testing.T) {
 			mysql.ShowPrimaryRow("test_table_02", "pk"),
 			mysql.ShowPrimaryRow("test_table_04", "pk"),
 			mysql.ShowPrimaryRow("seq", "id"),
+			mysql.ShowPrimaryRow("snow", "id"),
 		},
 	})
 	err = se.ReloadAt(context.Background(), pos1)
@@ -262,6 +267,7 @@ func TestReloadWithSwappedTables(t *testing.T) {
 				mysql.BaseShowTablesRow("test_table_02", false, ""),
 				mysql.BaseShowTablesRow("test_table_03", false, ""),
 				mysql.BaseShowTablesRow("seq", false, "vitess_sequence"),
+				mysql.BaseShowTablesRow("snow", false, "vitess_snowflake"),
 				mysql.BaseShowTablesRow("msg", false, "vitess_message,vt_ack_wait=30,vt_purge_after=120,vt_batch_size=1,vt_cache_size=10,vt_poller_interval=30"),
 			},
 			SessionStateChanges: "",
@@ -299,6 +305,7 @@ func TestReloadWithSwappedTables(t *testing.T) {
 				sqltypes.MakeTrusted(sqltypes.Int64, []byte("256")), // allocated_size
 			},
 			mysql.BaseShowTablesRow("seq", false, "vitess_sequence"),
+			mysql.BaseShowTablesRow("snow", false, "vitess_snowflake"),
 			mysql.BaseShowTablesRow("msg", false, "vitess_message,vt_ack_wait=30,vt_purge_after=120,vt_batch_size=1,vt_cache_size=10,vt_poller_interval=30"),
 		},
 	})
@@ -316,6 +323,7 @@ func TestReloadWithSwappedTables(t *testing.T) {
 			mysql.ShowPrimaryRow("test_table_03", "pk"),
 			mysql.ShowPrimaryRow("test_table_04", "mypk"),
 			mysql.ShowPrimaryRow("seq", "id"),
+			mysql.ShowPrimaryRow("snow", "id"),
 			mysql.ShowPrimaryRow("msg", "id"),
 		},
 	})
@@ -358,6 +366,7 @@ func TestReloadWithSwappedTables(t *testing.T) {
 			},
 			mysql.BaseShowTablesRow("test_table_04", false, ""),
 			mysql.BaseShowTablesRow("seq", false, "vitess_sequence"),
+			mysql.BaseShowTablesRow("snow", false, "vitess_snowflake"),
 			mysql.BaseShowTablesRow("msg", false, "vitess_message,vt_ack_wait=30,vt_purge_after=120,vt_batch_size=1,vt_cache_size=10,vt_poller_interval=30"),
 		},
 	})
@@ -381,6 +390,7 @@ func TestReloadWithSwappedTables(t *testing.T) {
 			mysql.ShowPrimaryRow("test_table_03", "mypk"),
 			mysql.ShowPrimaryRow("test_table_04", "pk"),
 			mysql.ShowPrimaryRow("seq", "id"),
+			mysql.ShowPrimaryRow("snow", "id"),
 			mysql.ShowPrimaryRow("msg", "id"),
 		},
 	})
@@ -568,6 +578,27 @@ func initialSchema() map[string]*Table {
 			FileSize:      0x64,
 			AllocatedSize: 0x96,
 			SequenceInfo:  &SequenceInfo{},
+		},
+		"snow": {
+			Name: sqlparser.NewTableIdent("snow"),
+			Type: Snowflake,
+			Fields: []*querypb.Field{{
+				Name: "id",
+				Type: sqltypes.Int32,
+			}, {
+				Name: "machine_id",
+				Type: sqltypes.Int64,
+			}},
+			PKColumns:     []int{0},
+			CreateTime:    1427325875,
+			FileSize:      0x64,
+			AllocatedSize: 0x96,
+			SnowflakeInfo: &SnowflakeInfo{
+				MachineID:     0,
+				Sequence:      0,
+				LastTimestamp: 0,
+				LastVal:       0,
+			},
 		},
 		"msg": {
 			Name: sqlparser.NewTableIdent("msg"),

@@ -34,10 +34,15 @@ func LoadTable(conn *connpool.DBConn, tableName string, comment string) (*Table,
 	if err := fetchColumns(ta, conn, sqlTableName); err != nil {
 		return nil, err
 	}
+	fmt.Println("fff comment", comment, "tableName", tableName)
 	switch {
 	case strings.Contains(comment, "vitess_sequence"):
 		ta.Type = Sequence
 		ta.SequenceInfo = &SequenceInfo{}
+	case strings.Contains(comment, "vitess_snowflake"):
+		ta.Type = Snowflake
+		ta.SnowflakeInfo = &SnowflakeInfo{}
+		fmt.Println("loaded snowflake table: ", tableName)
 	case strings.Contains(comment, "vitess_message"):
 		if err := loadMessageInfo(ta, comment); err != nil {
 			return nil, err

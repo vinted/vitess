@@ -44,6 +44,17 @@ func (cached *SequenceInfo) CachedSize(alloc bool) int64 {
 	}
 	return size
 }
+
+func (cached *SnowflakeInfo) CachedSize(alloc bool) int64 {
+	if cached == nil {
+		return int64(0)
+	}
+	size := int64(0)
+	if alloc {
+		size += int64(24) // TODO: not sure about this
+	}
+	return size
+}
 func (cached *Table) CachedSize(alloc bool) int64 {
 	if cached == nil {
 		return int64(0)
@@ -67,6 +78,8 @@ func (cached *Table) CachedSize(alloc bool) int64 {
 	}
 	// field SequenceInfo *vitess.io/vitess/go/vt/vttablet/tabletserver/schema.SequenceInfo
 	size += cached.SequenceInfo.CachedSize(true)
+	// field SequenceInfo *vitess.io/vitess/go/vt/vttablet/tabletserver/schema.SnowflakeInfo
+	size += cached.SnowflakeInfo.CachedSize(true)
 	// field MessageInfo *vitess.io/vitess/go/vt/vttablet/tabletserver/schema.MessageInfo
 	size += cached.MessageInfo.CachedSize(true)
 	return size

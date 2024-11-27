@@ -239,9 +239,11 @@ func modifyForAutoinc(ins *sqlparser.Insert, eins *engine.Insert) error {
 		row[colNum] = sqlparser.NewArgument(engine.SeqVarName + strconv.Itoa(rowNum))
 	}
 
+	// TODO: Here query is generated for Snoflake
 	eins.Generate = &engine.Generate{
 		Keyspace: eins.Table.AutoIncrement.Sequence.Keyspace,
 		Query:    fmt.Sprintf("select next :n values from %s", sqlparser.String(eins.Table.AutoIncrement.Sequence.Name)),
+		Type:     eins.Table.AutoIncrement.Sequence.Type,
 		Values:   autoIncValues,
 	}
 	return nil

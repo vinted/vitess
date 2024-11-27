@@ -255,6 +255,9 @@ func (pb *primitiveBuilder) buildTablePrimitive(tableExpr *sqlparser.AliasedTabl
 	switch {
 	case vschemaTable.Type == vindexes.TypeSequence:
 		eroute = engine.NewSimpleRoute(engine.SelectNext, vschemaTable.Keyspace)
+		// TODO: snowflake
+	case vschemaTable.Type == vindexes.TypeSnowflake:
+		eroute = engine.NewSimpleRoute(engine.SelectNext, vschemaTable.Keyspace)
 	case vschemaTable.Type == vindexes.TypeReference:
 		eroute = engine.NewSimpleRoute(engine.SelectReference, vschemaTable.Keyspace)
 	case !vschemaTable.Keyspace.Sharded:

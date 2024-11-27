@@ -84,6 +84,33 @@ func TestLoadTableSequence(t *testing.T) {
 	}
 }
 
+func TestLoadTableSnowflake(t *testing.T) {
+	db := fakesqldb.New(t)
+	defer db.Close()
+	for query, result := range getSnowflakeTableQueries() {
+		db.AddQuery(query, result)
+	}
+	table, err := newTestLoadTable("USER_TABLE", "vitess_snowflake", db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &Table{
+		Name: sqlparser.NewTableIdent("test_table"),
+		Type: Snowflake,
+		SnowflakeInfo: &SnowflakeInfo{
+			MachineID:     0,
+			Sequence:      0,
+			LastTimestamp: 0,
+			LastVal:       0,
+		},
+	}
+	table.Fields = nil
+	table.PKColumns = nil
+	if !reflect.DeepEqual(table, want) {
+		t.Errorf("Table:\n%#v, want\n%#v", table.SnowflakeInfo, want.SnowflakeInfo)
+	}
+}
+
 func TestLoadTableMessage(t *testing.T) {
 	db := fakesqldb.New(t)
 	defer db.Close()
@@ -188,6 +215,20 @@ func getTestLoadTableQueries() map[string]*sqltypes.Result {
 			}, {
 				Name: "addr",
 				Type: sqltypes.Int32,
+			}},
+		},
+	}
+}
+
+func getSnowflakeTableQueries() map[string]*sqltypes.Result {
+	return map[string]*sqltypes.Result{
+		"select * from test_table where 1 != 1": {
+			Fields: []*querypb.Field{{
+				Name: "id",
+				Type: sqltypes.Int64,
+			}, {
+				Name: "machine_id",
+				Type: sqltypes.Int64,
 			}},
 		},
 	}

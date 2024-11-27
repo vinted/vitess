@@ -253,6 +253,13 @@ func (se *Engine) MakeNonMaster() {
 			t.SequenceInfo.LastVal = 0
 			t.SequenceInfo.Unlock()
 		}
+		if t.SnowflakeInfo != nil {
+			t.SnowflakeInfo.Lock()
+			// We don't care about this, since each tablet has its own machine ID.
+			// t.SnowflakeInfo.NextVal = 0
+			// t.SnowflakeInfo.LastVal = 0
+			t.SnowflakeInfo.Unlock()
+		}
 	}
 }
 

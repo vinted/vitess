@@ -51,6 +51,7 @@ var TabletTypeSuffix = map[topodatapb.TabletType]string{
 // The following constants represent table types.
 const (
 	TypeSequence  = "sequence"
+	TypeSnowflake = "snowflake"
 	TypeReference = "reference"
 )
 
@@ -156,6 +157,7 @@ func (ks *KeyspaceSchema) MarshalJSON() ([]byte, error) {
 }
 
 // AutoIncrement contains the auto-inc information for a table.
+// TODO: We reuse same field for Snowflake and Sequence tables.
 type AutoIncrement struct {
 	Column   sqlparser.ColIdent `json:"column"`
 	Sequence *Table             `json:"sequence"`
@@ -177,7 +179,7 @@ func BuildVSchema(source *vschemapb.SrvVSchema) (vschema *VSchema) {
 }
 
 // BuildKeyspaceSchema builds the vschema portion for one keyspace.
-// The build ignores sequence references because those dependencies can
+// The build ignores sequence/snowflake references because those dependencies can
 // go cross-keyspace.
 func BuildKeyspaceSchema(input *vschemapb.Keyspace, keyspace string) (*KeyspaceSchema, error) {
 	if input == nil {
@@ -199,7 +201,7 @@ func BuildKeyspaceSchema(input *vschemapb.Keyspace, keyspace string) (*KeyspaceS
 }
 
 // ValidateKeyspace ensures that the keyspace vschema is valid.
-// External references (like sequence) are not validated.
+// External references (like sequence/snowflake) are not validated.
 func ValidateKeyspace(input *vschemapb.Keyspace) error {
 	_, err := BuildKeyspaceSchema(input, "")
 	return err
@@ -250,6 +252,11 @@ func buildTables(ks *vschemapb.Keyspace, vschema *VSchema, ksvschema *KeyspaceSc
 		case TypeSequence:
 			if keyspace.Sharded && table.Pinned == "" {
 				return fmt.Errorf("sequence table has to be in an unsharded keyspace or must be pinned: %s", tname)
+			}
+			t.Type = table.Type
+		case TypeSnowflake:
+			if keyspace.Sharded && table.Pinned == "" {
+				return fmt.Errorf("snowflake table has to be in an unsharded keyspace or must be pinned: %s", tname)
 			}
 			t.Type = table.Type
 		default:
@@ -354,6 +361,7 @@ func resolveAutoIncrement(source *vschemapb.SrvVSchema, vschema *VSchema) {
 			if t == nil || table.AutoIncrement == nil {
 				continue
 			}
+			// TODO: Should I check for type here
 			seqks, seqtab, err := sqlparser.ParseTable(table.AutoIncrement.Sequence)
 			var seq *Table
 			if err == nil {
