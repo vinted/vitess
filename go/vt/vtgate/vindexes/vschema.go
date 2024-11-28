@@ -255,9 +255,7 @@ func buildTables(ks *vschemapb.Keyspace, vschema *VSchema, ksvschema *KeyspaceSc
 			}
 			t.Type = table.Type
 		case TypeSnowflake:
-			if keyspace.Sharded && table.Pinned == "" {
-				return fmt.Errorf("snowflake table has to be in an unsharded keyspace or must be pinned: %s", tname)
-			}
+			// Snowflake should be ok to use with multiple shards
 			t.Type = table.Type
 		default:
 			return fmt.Errorf("unidentified table type %s", table.Type)

@@ -29,6 +29,116 @@ import (
 	vschemapb "vitess.io/vitess/go/vt/proto/vschema"
 )
 
+func TestInsertShardedSnoflakeGenerate(t *testing.T) {
+	invschema := &vschemapb.SrvVSchema{
+		Keyspaces: map[string]*vschemapb.Keyspace{
+			"sharded": {
+				Sharded: true,
+				Vindexes: map[string]*vschemapb.Vindex{
+					"hash": {
+						Type: "hash",
+					},
+				},
+				Tables: map[string]*vschemapb.Table{
+					"t1": {
+						ColumnVindexes: []*vschemapb.ColumnVindex{{
+							Name:    "hash",
+							Columns: []string{"id"},
+						}},
+					},
+				},
+			},
+		},
+	}
+	vs := vindexes.BuildVSchema(invschema)
+	ks := vs.Keyspaces["sharded"]
+
+	ins := NewInsert(
+		InsertSharded,
+		ks.Keyspace,
+		[]sqltypes.PlanValue{{
+			// colVindex columns: id
+			Values: []sqltypes.PlanValue{{
+				// 5 rows.
+				Values: []sqltypes.PlanValue{{
+					Value: sqltypes.NewInt64(1),
+				}, {
+					Value: sqltypes.NewInt64(2),
+				}, {
+					Value: sqltypes.NewInt64(3),
+				}, {
+					Value: sqltypes.NewInt64(4),
+				}, {
+					Value: sqltypes.NewInt64(5),
+				}},
+			}},
+		}},
+		ks.Tables["t1"],
+		"prefix",
+		[]string{" mid1", " mid2", " mid3", " mid4", " mid5"},
+		" suffix",
+	)
+
+	ins.Generate = &Generate{
+		Keyspace: &vindexes.Keyspace{
+			Name:    "ks2",
+			Sharded: true,
+		},
+		Type:  "snowflake",
+		Query: "dummy_snowflake_generate",
+		Values: sqltypes.PlanValue{
+			Values: []sqltypes.PlanValue{
+				{Value: sqltypes.NewInt64(1)},
+				{Value: sqltypes.NULL},
+				{Value: sqltypes.NewInt64(2)},
+				{Value: sqltypes.NULL},
+				{Value: sqltypes.NULL},
+			},
+		},
+	}
+
+	vc := newDMLTestVCursor("-20", "20-")
+	vc.shardForKsid = []string{"20-", "-20", "20-", "-20", "-20"}
+
+	// Snowflake ids
+	// | 2124054243676528637 | 1732771994712 | 2024-11-28 05:33:14.7120                                |     4093 |          1 |
+	// | 2124054243676528638 | 1732771994712 | 2024-11-28 05:33:14.7120                                |     4094 |          1 |
+	// | 2124054243680718848 | 1732771994713 | 2024-11-28 05:33:14.7130                                |        0 |          1 |
+	vc.results = []*sqltypes.Result{
+		sqltypes.MakeTestResult(
+			sqltypes.MakeTestFields(
+				"nextval",
+				"int64",
+			),
+			"2124054243676528637",
+		),
+		{InsertID: 1},
+	}
+
+	result, err := ins.Execute(vc, map[string]*querypb.BindVariable{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vc.ExpectLog(t, []string{
+		`ResolveDestinations ks2 [] Destinations:DestinationAnyShard()`,
+		`ExecuteStandalone dummy_snowflake_generate n: type:INT64 value:"3" ks2 -20`,
+		// Based on shardForKsid, values returned will be 20-, -20, 20-.
+		`ResolveDestinations sharded [value:"0" value:"1" value:"2" value:"3" value:"4"] Destinations:DestinationKeyspaceID(166b40b44aba4bd6),DestinationKeyspaceID(06e7ea22ce92708f),DestinationKeyspaceID(4eb190c9a2fa169c),DestinationKeyspaceID(d2fd8867d50d2dfe),DestinationKeyspaceID(70bb023c810ca87a)`,
+		// Row 2 will go to -20, rows 1 & 3 will go to 20-
+		`ExecuteMultiShard ` +
+			`sharded.20-: prefix mid1, mid3 suffix ` +
+			`{__seq0: type:INT64 value:"1" __seq1: type:INT64 value:"2124054243676528637" __seq2: type:INT64 value:"2" __seq3: type:INT64 value:"2124054243676528638" __seq4: type:INT64 value:"2124054243680718848" ` +
+			`_id_0: type:INT64 value:"1" _id_1: type:INT64 value:"2" _id_2: type:INT64 value:"3" _id_3: type:INT64 value:"4" _id_4: type:INT64 value:"5"} ` +
+			`sharded.-20: prefix mid2, mid4, mid5 suffix ` +
+			`{__seq0: type:INT64 value:"1" __seq1: type:INT64 value:"2124054243676528637" __seq2: type:INT64 value:"2" __seq3: type:INT64 value:"2124054243676528638" __seq4: type:INT64 value:"2124054243680718848" ` +
+			`_id_0: type:INT64 value:"1" _id_1: type:INT64 value:"2" _id_2: type:INT64 value:"3" _id_3: type:INT64 value:"4" _id_4: type:INT64 value:"5"} ` +
+			`true false`,
+	})
+
+	// The insert id returned by ExecuteMultiShard should be overwritten by processGenerate.
+	expectResult(t, "Execute", result, &sqltypes.Result{InsertID: 2124054243676528637})
+}
+
 func TestInsertUnshardedSnowflakeGenerate(t *testing.T) {
 	ins := NewQueryInsert(
 		InsertUnsharded,

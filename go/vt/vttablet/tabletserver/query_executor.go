@@ -537,7 +537,6 @@ func (qre *QueryExecutor) execNextval() (*sqltypes.Result, error) {
 		return nil, err
 	}
 	tableName := qre.plan.TableName()
-	// check if snowflake
 
 	if inc < 1 {
 		return nil, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "invalid increment for sequence or snowflake %s: %d", tableName, inc)
@@ -599,7 +598,6 @@ func (qre *QueryExecutor) execNextval() (*sqltypes.Result, error) {
 		}
 		ret = t.SequenceInfo.NextVal
 		t.SequenceInfo.NextVal += inc
-
 	} else if qre.plan.Table.SnowflakeInfo != nil {
 		t := qre.plan.Table
 		t.SnowflakeInfo.Lock()
@@ -628,12 +626,11 @@ func (qre *QueryExecutor) execNextval() (*sqltypes.Result, error) {
 			}
 		}
 
-		// Generate new id here, return it and update last val with overflow
-		nextID, err := t.SnowflakeInfo.NextNID(inc, currentMillis())
+		// generate first Snowflake id from requested range
+		ret, err = t.SnowflakeInfo.NextNID(inc, currentMillis())
 		if err != nil {
 			return nil, vterrors.Wrapf(err, "error generating snowflake with NextNID(%d) %s", inc, tableName)
 		}
-		ret = int64(nextID)
 	}
 	return &sqltypes.Result{
 		Fields: sequenceFields,

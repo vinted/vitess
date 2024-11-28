@@ -336,53 +336,76 @@ func (ins *Insert) processGenerate(vcursor VCursor, bindVars map[string]*querypb
 
 	// If generation is needed, generate the requested number of values (as one call).
 	if count != 0 {
-		rss, _, err := vcursor.ResolveDestinations(ins.Generate.Keyspace.Name, nil, []key.Destination{key.DestinationAnyShard{}})
-		if err != nil {
-			return 0, err
-		}
-		// TODO: place where to decide routing maybe for snowflake
-		if len(rss) != 1 {
-			return 0, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "auto sequence generation can happen through single shard only, it is getting routed to %d shards", len(rss))
-		}
-		bindVars := map[string]*querypb.BindVariable{"n": sqltypes.Int64BindVariable(count)}
-		qr, err := vcursor.ExecuteStandalone(ins.Generate.Query, bindVars, rss[0])
-		if err != nil {
-			return 0, err
-		}
-		// If no rows are returned, it's an internal error, and the code
-		// must panic, which will be caught and reported.
-		insertID, err = evalengine.ToInt64(qr.Rows[0][0])
-		if err != nil {
-			return 0, err
+		if ins.Generate.Type == vindexes.TypeSnowflake {
+			// We will pick any shard
+			rss, _, err := vcursor.ResolveDestinations(ins.Generate.Keyspace.Name, nil, []key.Destination{key.DestinationAnyShard{}})
+			if err != nil {
+				return 0, err
+			}
+			if len(rss) != 1 {
+				return 0, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "auto snowflake generation can happen with at least one shard this keyspace: %s", ins.Generate.Keyspace.Name)
+			}
+			bindVars := map[string]*querypb.BindVariable{"n": sqltypes.Int64BindVariable(count)}
+			qr, err := vcursor.ExecuteStandalone(ins.Generate.Query, bindVars, rss[0])
+			if err != nil {
+				return 0, err
+			}
+			// If no rows are returned, it's an internal error, and the code
+			// must panic, which will be caught and reported.
+			insertID, err = evalengine.ToInt64(qr.Rows[0][0])
+			if err != nil {
+				return 0, err
+			}
+		} else {
+			rss, _, err := vcursor.ResolveDestinations(ins.Generate.Keyspace.Name, nil, []key.Destination{key.DestinationAnyShard{}})
+			if err != nil {
+				return 0, err
+			}
+			if len(rss) != 1 {
+				return 0, vterrors.Errorf(vtrpcpb.Code_INVALID_ARGUMENT, "auto sequence generation can happen through single shard only, it is getting routed to %d shards", len(rss))
+			}
+			bindVars := map[string]*querypb.BindVariable{"n": sqltypes.Int64BindVariable(count)}
+			qr, err := vcursor.ExecuteStandalone(ins.Generate.Query, bindVars, rss[0])
+			if err != nil {
+				return 0, err
+			}
+			// If no rows are returned, it's an internal error, and the code
+			// must panic, which will be caught and reported.
+			insertID, err = evalengine.ToInt64(qr.Rows[0][0])
+			if err != nil {
+				return 0, err
+			}
 		}
 	}
 
-	// Fill the holes where no value was supplied.
-	// For Snowflake
+	// Fill the holes where no value was supplied depending on the type of sequence: snowflake or sequence
+	cur := insertID
+	// for Snowflake
 	if ins.Generate.Type == vindexes.TypeSnowflake {
-		cur := insertID
+		var totalInc int64
 		ts := (cur >> int64(SequenceLength+MachineIDLength)) + SnowflakeStartTime.UTC().UnixNano()/1e6
 		sequence := cur & int64(MaxSequence)
 		machineID := (cur & (int64(MaxMachineID) << SequenceLength)) >> SequenceLength
 		for i, v := range resolved {
-			fmt.Println(fmt.Sprintf("Generating Snowflake, %s id %d", ins.GetTableName(), cur))
 			if shouldGenerate(v) {
 				bindVars[SeqVarName+strconv.Itoa(i)] = sqltypes.Int64BindVariable(cur)
 				// calculate next id and advance ts and sequence
-				totalInc := sequence + 1
-				ts := ts + totalInc/MaxSequence
+				totalInc = sequence + 1
+				ts = ts + totalInc/MaxSequence
 				sequence = totalInc % MaxSequence
 				// TODO: generate next id properly for snowflake
 				df := elapsedTime(ts, SnowflakeStartTime)
-				cur = int64((uint64(df) << uint64(timestampMoveLength)) | (uint64(machineID) << uint64(machineIDMoveLength)) | uint64(sequence))
+				cur = (df << timestampMoveLength) | (machineID << machineIDMoveLength) | sequence
+				fmt.Println(
+					((df << timestampMoveLength) | (machineID << machineIDMoveLength) | sequence),
+				)
 			} else {
 				bindVars[SeqVarName+strconv.Itoa(i)] = sqltypes.ValueBindVariable(v)
 			}
 		}
 		return insertID, nil
 	}
-	// For Sequence
-	cur := insertID
+	// for Sequence
 	for i, v := range resolved {
 		if shouldGenerate(v) {
 			bindVars[SeqVarName+strconv.Itoa(i)] = sqltypes.Int64BindVariable(cur)

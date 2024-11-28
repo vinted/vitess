@@ -89,13 +89,12 @@ const (
 )
 
 var (
-	// default starttime
+	// default Snowflake start time
 	SnowflakeStartTime = time.Date(2008, 11, 10, 23, 0, 0, 0, time.UTC)
 )
 
 // SnowflakeInfo contains info specific to sequence tabels.
 // It must be locked before accessing the values inside.
-// If CurVal==LastVal, we have to cache new values.
 // When the schema is first loaded, the values are all 0,
 // which will trigger caching on first use.
 type SnowflakeInfo struct {
@@ -113,15 +112,20 @@ func elapsedTime(noms int64, s time.Time) int64 {
 }
 
 func (s *SnowflakeInfo) NextNID(inc int64, currentTimestamp int64) (int64, error) {
-	fmt.Println("----------")
 	// need to pass timestamo in order to make it more testable
 	// currentTimestamp := currentMillis()
 	var firstSequence, firstTimestamp int64
 	if s.LastTimestamp < currentTimestamp {
+		// calculate timestamp and sequence for first id
 		firstTimestamp = currentTimestamp
 		firstSequence = 0
-		s.LastTimestamp = currentTimestamp
-		s.Sequence = 0
+		// // calculate timestamp and sequence for last id
+		// s.LastTimestamp = currentTimestamp
+		// s.Sequence = 0
+		// calculate timestamp and sequence for last id
+		lastInc := inc - 1
+		s.LastTimestamp = currentTimestamp + lastInc/MaxSequence // add overflow to timestamp as ms
+		s.Sequence = lastInc % MaxSequence                       // set last sequence
 	} else {
 		if s.LastTimestamp > currentTimestamp {
 			fmt.Println("current timestamp is less than last timestamp, so we are overflowing again")
@@ -129,21 +133,22 @@ func (s *SnowflakeInfo) NextNID(inc int64, currentTimestamp int64) (int64, error
 		} else {
 			fmt.Println("Same timestamp", currentTimestamp)
 		}
-		// calculate first id values
+		// calculate timestamp and sequence for first id
 		firstInc := s.Sequence + 1
 		firstTimestamp = currentTimestamp + firstInc/MaxSequence // add overflow to timestamp as ms
 		firstSequence = firstInc % MaxSequence                   // set first sequence
-		// calculate last id values
+		// calculate timestamp and sequence for last id
 		lastInc := s.Sequence + inc
 		s.LastTimestamp = currentTimestamp + lastInc/MaxSequence // add overflow to timestamp as ms
 		s.Sequence = lastInc % MaxSequence                       // set last sequence
 	}
+
 	fmt.Println("firstSequence", firstSequence, "firstTimestamp", firstTimestamp)
 	fmt.Println("lastSequence", s.Sequence, "lastTimestamp", s.LastTimestamp)
 
 	firstDF := elapsedTime(firstTimestamp, SnowflakeStartTime)
-	firstId := (uint64(firstDF) << uint64(timestampMoveLength)) | (uint64(s.MachineID) << uint64(machineIDMoveLength)) | uint64(firstSequence)
-	return int64(firstId), nil
+	firstId := (firstDF << timestampMoveLength) | (s.MachineID << machineIDMoveLength) | firstSequence
+	return firstId, nil
 }
 
 // SetMachineID specify the machine ID. It will panic when machined > max limit for 2^10-1.
@@ -155,20 +160,6 @@ func (s *SnowflakeInfo) SetMachineID(m int64) error {
 	s.MachineID = m
 	return nil
 }
-
-// // ParseID parse snowflake it to SID struct.
-// func ParseSnowflakeID(id uint64) SnowflakeID {
-// 	t := id >> uint64(SequenceLength+MachineIDLength)
-// 	sequence := id & uint64(MaxSequence)
-// 	mID := (id & (uint64(MaxMachineID) << SequenceLength)) >> SequenceLength
-
-// 	return SnowflakeID{
-// 		ID:        id,
-// 		Sequence:  sequence,
-// 		MachineID: mID,
-// 		Timestamp: t,
-// 	}
-// }
 
 // MessageInfo contains info specific to message tables.
 type MessageInfo struct {

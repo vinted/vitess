@@ -13,12 +13,11 @@ func compareSnowflake(t *testing.T, id, wantTimestamp int64, wantSequence int64,
 	gotMachineID := (id & (int64(MaxMachineID) << SequenceLength)) >> SequenceLength
 	fmt.Println("got ", gotTimestamp, gotSequence, gotMachineID)
 	assert.Equal(t, wantSequence, gotSequence)
-	// assert.Equal(t, wantMachineID, gotMachineID)
-	// this is a flaky test
 	assert.Equal(t, wantTimestamp, gotTimestamp)
+	assert.Equal(t, wantMachineID, gotMachineID)
 }
 
-func TestNextNID(t *testing.T) {
+func TestNextNIDSameTimestamp(t *testing.T) {
 	snow := &SnowflakeInfo{}
 	snow.SetMachineID(1)
 	ts := int64(1732711077200)
@@ -27,7 +26,6 @@ func TestNextNID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("qre.Execute() = %v, want nil", err)
 	}
-	// assert.Equal(t, gotId, snow.LastVal)
 	compareSnowflake(t, gotId, ts, 0, 1)
 
 	// test multiple values within same ms (flaky)
@@ -50,6 +48,34 @@ func TestNextNID(t *testing.T) {
 		t.Fatalf("qre.Execute() = %v, want nil", err)
 	}
 	compareSnowflake(t, gotId, ts+1, 910, 1)
+}
 
-	assert.Equal(t, 1, 2)
+func TestNextIDOne(t *testing.T) {
+	snow := &SnowflakeInfo{}
+	snow.SetMachineID(1)
+	ts := int64(1732711077200)
+
+	gotId, err := snow.NextNID(1, ts)
+	if err != nil {
+		t.Fatalf("qre.Execute() = %v, want nil", err)
+	}
+	// last sequence should be 0
+	assert.Equal(t, int64(0), snow.Sequence)
+	compareSnowflake(t, gotId, ts, 0, 1)
+
+}
+
+func TestNextIDTwo(t *testing.T) {
+	snow := &SnowflakeInfo{}
+	snow.SetMachineID(1)
+	ts := int64(1732711077200)
+
+	gotId, err := snow.NextNID(2, ts)
+	if err != nil {
+		t.Fatalf("qre.Execute() = %v, want nil", err)
+	}
+	// last sequence should be 1
+	assert.Equal(t, int64(1), snow.Sequence)
+	compareSnowflake(t, gotId, ts, 0, 1)
+
 }
