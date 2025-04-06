@@ -72,6 +72,7 @@ func (uvs *uvstreamer) catchup(ctx context.Context) error {
 
 	errch := make(chan error, 1)
 	go func() {
+		uvs.stopPos = mysql.Position{} // reset stopPos which was potentially set during fastforward
 		startPos := mysql.EncodePosition(uvs.pos)
 		vs := newVStreamer(ctx, uvs.cp, uvs.se, startPos, "", uvs.filter, uvs.getVSchema(), uvs.send2, "catchup", uvs.vse)
 		uvs.setVs(vs)
