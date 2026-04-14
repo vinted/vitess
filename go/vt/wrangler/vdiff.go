@@ -803,12 +803,8 @@ func (df *vdiff) restartTargets(ctx context.Context) error {
 	return df.forAll(df.targets, func(shard string, target *shardStreamer) error {
 		query := fmt.Sprintf("update _vt.vreplication set state='Running', message='', stop_pos='' where db_name=%s and workflow=%s", encodeString(target.master.DbName()), encodeString(df.ts.WorkflowName()))
 		log.Infof("restarting target replication with %s", query)
-<<<<<<< HEAD
-		_, err := df.ts.TabletManagerClient().VReplicationExec(ctx, target.master.Tablet, query)
-=======
 		log.Infof("VDIFF: [restartTargets] ( shard: %s tablet: %s hostname: %s) restarting target replication with %s ", target.master.GetShard(), target.master.GetAlias(), target.master.GetHostname(), query)
-		_, err := df.ts.wr.tmc.VReplicationExec(ctx, target.master.Tablet, query)
->>>>>>> bb3e4fb39d (add extra verbosity to VDiff)
+		_, err := df.ts.TabletManagerClient().VReplicationExec(ctx, target.master.Tablet, query)
 		return err
 	})
 }
