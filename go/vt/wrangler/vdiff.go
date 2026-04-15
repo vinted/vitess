@@ -692,12 +692,15 @@ func (df *vdiff) startQueryStreams(ctx context.Context, keyspace string, partici
 		}
 		log.Infof("WaitForPosition: tablet %s should reach position %s", participant.tablet.Alias.String(), mysql.EncodePosition(participant.position))
 		if err := df.ts.TabletManagerClient().WaitForPosition(waitCtx, participant.tablet, mysql.EncodePosition(participant.position)); err != nil {
-			log.Errorf("WaitForPosition error: %s", err)
+			log.Errorf("VDIFF:[startQueryStreams] WaitForPosition error for keyspace=%s shard=%s tablet=%s: %v",
+				keyspace, shard, topoproto.TabletAliasString(participant.tablet.Alias), err)
 			return vterrors.Wrapf(err, "WaitForPosition for tablet %v", topoproto.TabletAliasString(participant.tablet.Alias))
 		}
 		participant.result = make(chan *sqltypes.Result, 1)
 		gtidch := make(chan string, 1)
 
+		log.Infof("VDIFF:[startQueryStreams] launching streamOne for keyspace=%s shard=%s tablet=%s",
+			keyspace, shard, topoproto.TabletAliasString(participant.tablet.Alias))
 		// Start the stream in a separate goroutine.
 		go df.streamOne(ctx, keyspace, shard, participant, query, gtidch)
 
@@ -723,11 +726,16 @@ func (df *vdiff) streamOne(ctx context.Context, keyspace, shard string, particip
 	defer close(participant.result)
 	defer close(gtidch)
 
+	log.Infof("VDIFF:[streamOne] starting stream for keyspace=%s shard=%s tablet=%s query=%s",
+		keyspace, shard, topoproto.TabletAliasString(participant.tablet.Alias), query)
+
 	// Wrap the streaming in a separate function so we can capture the error.
 	// This shows that the error will be set before the channels are closed.
 	participant.err = func() error {
 		conn, err := tabletconn.GetDialer()(participant.tablet, grpcclient.FailFast(false))
 		if err != nil {
+			log.Errorf("VDIFF:[streamOne] failed to dial tablet %s for keyspace=%s shard=%s: %v",
+				topoproto.TabletAliasString(participant.tablet.Alias), keyspace, shard, err)
 			return err
 		}
 		defer conn.Close(ctx)
@@ -738,9 +746,20 @@ func (df *vdiff) streamOne(ctx context.Context, keyspace, shard string, particip
 			TabletType: participant.tablet.Type,
 		}
 		var fields []*querypb.Field
-		return conn.VStreamResults(ctx, target, query, func(vrs *binlogdatapb.VStreamResultsResponse) error {
+		var batchCount int64
+		var totalRows int64
+		streamErr := conn.VStreamResults(ctx, target, query, func(vrs *binlogdatapb.VStreamResultsResponse) error {
+			batchCount++
+			rowsInBatch := int64(len(vrs.Rows))
+			totalRows += rowsInBatch
+			if batchCount%1000 == 0 {
+				log.Infof("VDIFF:[streamOne] progress keyspace=%s shard=%s tablet=%s batches=%d totalRows=%d",
+					keyspace, shard, topoproto.TabletAliasString(participant.tablet.Alias), batchCount, totalRows)
+			}
 			if vrs.Fields != nil {
 				fields = vrs.Fields
+				log.Infof("VDIFF:[streamOne] received fields for keyspace=%s shard=%s tablet=%s gtid=%s fieldCount=%d",
+					keyspace, shard, topoproto.TabletAliasString(participant.tablet.Alias), vrs.Gtid, len(fields))
 				gtidch <- vrs.Gtid
 			}
 			p3qr := &querypb.QueryResult{
@@ -755,10 +774,20 @@ func (df *vdiff) streamOne(ctx context.Context, keyspace, shard string, particip
 			select {
 			case participant.result <- result:
 			case <-ctx.Done():
+				log.Errorf("VDIFF:[streamOne] context cancelled while sending result for keyspace=%s shard=%s tablet=%s after %d batches %d rows: %v",
+					keyspace, shard, topoproto.TabletAliasString(participant.tablet.Alias), batchCount, totalRows, ctx.Err())
 				return vterrors.Wrap(ctx.Err(), "VStreamResults")
 			}
 			return nil
 		})
+		if streamErr != nil {
+			log.Errorf("VDIFF:[streamOne] VStreamResults ended with error for keyspace=%s shard=%s tablet=%s after %d batches %d rows: %v",
+				keyspace, shard, topoproto.TabletAliasString(participant.tablet.Alias), batchCount, totalRows, streamErr)
+		} else {
+			log.Infof("VDIFF:[streamOne] VStreamResults completed successfully for keyspace=%s shard=%s tablet=%s batches=%d totalRows=%d",
+				keyspace, shard, topoproto.TabletAliasString(participant.tablet.Alias), batchCount, totalRows)
+		}
+		return streamErr
 	}()
 }
 
@@ -862,6 +891,9 @@ func (pe *primitiveExecutor) next() ([]sqltypes.Value, error) {
 	for len(pe.rows) == 0 {
 		qr, ok := <-pe.resultch
 		if !ok {
+			if pe.err != nil {
+				log.Errorf("VDIFF:[primitiveExecutor.next] result channel closed with error: %v", pe.err)
+			}
 			return nil, pe.err
 		}
 		pe.rows = qr.Rows
@@ -890,10 +922,18 @@ func (pe *primitiveExecutor) drain(ctx context.Context) (int, error) {
 // shardStreamer
 
 func (sm *shardStreamer) StreamExecute(vcursor engine.VCursor, bindVars map[string]*querypb.BindVariable, wantfields bool, callback func(*sqltypes.Result) error) error {
+	var rowCount int64
 	for result := range sm.result {
+		rowCount += int64(len(result.Rows))
 		if err := callback(result); err != nil {
+			log.Errorf("VDIFF:[StreamExecute] callback error for tablet=%s after %d rows: %v",
+				topoproto.TabletAliasString(sm.tablet.Alias), rowCount, err)
 			return err
 		}
+	}
+	if sm.err != nil {
+		log.Errorf("VDIFF:[StreamExecute] stream ended with error for tablet=%s after %d rows: %v",
+			topoproto.TabletAliasString(sm.tablet.Alias), rowCount, sm.err)
 	}
 	return sm.err
 }
@@ -949,10 +989,11 @@ func (td *tableDiffer) diff(ctx context.Context, rowsToCompare *int64, debug, on
 		if advanceSource {
 			sourceRow, err = sourceExecutor.next()
 			if err != nil {
+				log.Errorf("VDIFF:[diff:advanceSource] failed for table=%s after processedRows=%d error: %v", td.targetTable, dr.ProcessedRows, err)
 				if sourceRowPrevious != nil {
-					log.Errorf("VDIFF:[diff:advanceSource] failed, previous row: %s", formatRowDiff(sourceRowPrevious))
+					log.Errorf("VDIFF:[diff:advanceSource] previous source row: %s", formatRowDiff(sourceRowPrevious))
 				} else {
-					log.Error("VDIFF:[diff:advanceSource] failed, previous row: nil")
+					log.Error("VDIFF:[diff:advanceSource] previous source row: nil")
 				}
 				return nil, err
 			}
@@ -960,10 +1001,11 @@ func (td *tableDiffer) diff(ctx context.Context, rowsToCompare *int64, debug, on
 		if advanceTarget {
 			targetRow, err = targetExecutor.next()
 			if err != nil {
+				log.Errorf("VDIFF:[diff:advanceTarget] failed for table=%s after processedRows=%d error: %v", td.targetTable, dr.ProcessedRows, err)
 				if targetRowPrevious != nil {
-					log.Errorf("VDIFF:[diff:advanceTarget] failed, previous row: %s", formatRowDiff(targetRowPrevious))
+					log.Errorf("VDIFF:[diff:advanceTarget] previous target row: %s", formatRowDiff(targetRowPrevious))
 				} else {
-					log.Error("VDIFF:[diff:advanceTarget] failed, previous row: nil")
+					log.Error("VDIFF:[diff:advanceTarget] previous target row: nil")
 				}
 				return nil, err
 			}
