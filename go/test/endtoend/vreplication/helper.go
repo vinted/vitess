@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -329,12 +328,6 @@ func printRoutingRules(t *testing.T, vc *VitessCluster, msg string) error {
 	}
 	fmt.Printf("Routing Rules::%s:\n%s\n", msg, output)
 	return nil
-}
-
-func osExec(t *testing.T, command string, args []string) (string, error) {
-	cmd := exec.Command(command, args...)
-	output, err := cmd.CombinedOutput()
-	return string(output), err
 }
 
 func getDebugVar(t *testing.T, port int, varPath []string) (string, error) {
