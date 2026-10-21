@@ -15,6 +15,10 @@ jobs:
     - name: Tune the OS
       run: |
         echo '1024 65535' | sudo tee -a /proc/sys/net/ipv4/ip_local_port_range
+        # The test clusters listen on fixed ports in this range. Keep them out
+        # of the (widened) ephemeral range so that an outgoing connection can
+        # never grab a port that mysqld or a vttablet is about to bind.
+        sudo sysctl -w net.ipv4.ip_local_reserved_ports=6700-35000
 
     - name: Check out code
       uses: actions/checkout@v4
