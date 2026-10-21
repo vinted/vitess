@@ -322,6 +322,10 @@ func TestBindInSelect(t *testing.T) {
 			},
 		},
 	}
+	// MySQL 8.0.3x+ reports a column length of 2 for the literal 1.
+	if len(qr.Fields) == 1 && qr.Fields[0].ColumnLength == 2 {
+		qr.Fields[0].ColumnLength = 1
+	}
 	if !qr.Equal(want) {
 		// MariaDB 10.3 has different behavior.
 		want2 := want.Copy()
@@ -834,9 +838,10 @@ func TestSysSchema(t *testing.T) {
 	assert.Equal(t, `VARCHAR("NO")`, qr.Rows[0][8].String())
 	assert.Equal(t, `VARCHAR("NO")`, qr.Rows[1][8].String())
 
-	// table_name
-	assert.Equal(t, `VARCHAR("a")`, qr.Rows[0][10].String())
-	assert.Equal(t, `VARCHAR("a")`, qr.Rows[1][10].String())
+	// table_name. Depending on the MySQL 8.0 version and lower_case_table_names
+	// the column is reported as VARCHAR or VARBINARY, so only check the value.
+	assert.Equal(t, "a", qr.Rows[0][10].ToString())
+	assert.Equal(t, "a", qr.Rows[1][10].ToString())
 
 	// The field Type and the row value type are not matching and because of this wrong packet is send regarding the data of bigint unsigned to the client on vttestserver.
 	// On, Vitess cluster using protobuf we are doing the row conversion to field type and so the final row type send to client is same as field type.

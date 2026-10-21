@@ -100,10 +100,16 @@ var (
 		"vstream_stoponreshard_true",
 		"vstream_stoponreshard_false",
 	}
-	// TODO: currently some percona tools including xtrabackup are installed on all clusters, we can possibly optimize
-	// this by only installing them in the required clusters
-	clustersRequiringXtraBackup = clusterList
-	clustersRequiringMakeTools  = []string{
+	// Clusters whose tests use xtrabackup (see go/test/endtoend/backup and
+	// go/test/endtoend/recovery). Installing it everywhere adds the Percona
+	// repository to every job for no benefit.
+	clustersRequiringXtraBackup = []string{
+		"11",
+		"16",
+		"20",
+		"xb_recovery",
+	}
+	clustersRequiringMakeTools = []string{
 		"18",
 		"24",
 	}
