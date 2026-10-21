@@ -423,6 +423,11 @@ func expectLogs(ctx context.Context, t *testing.T, query string, eventCh chan []
 			if evs[i].Type == binlogdatapb.VEventType_FIELD {
 				for j := range evs[i].FieldEvent.Fields {
 					evs[i].FieldEvent.Fields[j].Flags = 0
+					// MySQL 8.0.19+ no longer reports the display width of
+					// integer columns; the expected output uses the old form.
+					if evs[i].FieldEvent.Fields[j].ColumnType == "int" {
+						evs[i].FieldEvent.Fields[j].ColumnType = "int(11)"
+					}
 				}
 				evs[i].FieldEvent.Keyspace = ""
 				evs[i].FieldEvent.Shard = ""

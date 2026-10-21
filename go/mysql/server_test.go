@@ -1206,9 +1206,13 @@ func TestListenerShutdown(t *testing.T) {
 	err = conn.Ping()
 	require.NoError(t, err)
 
+	// connRefuse is a global counter that the Accept loop of a listener bumps
+	// when it exits, so listeners closed by earlier tests can still increment
+	// it concurrently. Check that this listener's shutdown is counted,
+	// asynchronously.
+	connRefuseBefore := connRefuse.Get()
 	l.Shutdown()
-
-	assert.EqualValues(t, 1, connRefuse.Get(), "connRefuse")
+	assert.Eventually(t, func() bool { return connRefuse.Get() > connRefuseBefore }, 10*time.Second, 10*time.Millisecond, "connRefuse")
 
 	err = conn.Ping()
 	require.EqualError(t, err, "Server shutdown in progress (errno 1053) (sqlstate 08S01)")
