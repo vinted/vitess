@@ -94,7 +94,7 @@ func waitForWorkflowState(t *testing.T, vc *VitessCluster, ksWorkflow string, wa
 		require.NoError(t, err, output)
 
 		var rsr wrangler.ReplicationStatusResult
-		err = json2.Unmarshal([]byte(output), rsr)
+		err = json2.Unmarshal([]byte(output), &rsr)
 		require.Nil(t, err)
 
 		done = true
