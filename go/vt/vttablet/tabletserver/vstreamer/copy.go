@@ -18,6 +18,7 @@ package vstreamer
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"math"
@@ -29,6 +30,14 @@ import (
 	binlogdatapb "vitess.io/vitess/go/vt/proto/binlogdata"
 	querypb "vitess.io/vitess/go/vt/proto/query"
 )
+
+// copyPhaseDuration is the maximum duration of a single copy cycle of a table, see copyTable
+var copyPhaseDuration = flag.Duration("vstream_copy_phase_duration", 0,
+	"Maximum duration of a single VStream copy cycle. Rows are copied under a consistent snapshot, which "+
+		"prevents InnoDB from purging undo logs of later changes, so the history list grows for as long as "+
+		"the snapshot is open. When the duration elapses, the copy pauses, catches up on the binlog and "+
+		"resumes from the last copied primary key with a new snapshot. 0 (default) copies each table "+
+		"under a single snapshot")
 
 // starts the copy phase for the first table in the (sorted) list.
 // can be continuing the copy of a partially completed table or start a new one
@@ -72,6 +81,7 @@ func (uvs *uvstreamer) catchup(ctx context.Context) error {
 
 	errch := make(chan error, 1)
 	go func() {
+		uvs.stopPos = mysql.Position{} // reset stopPos which was potentially set during fastforward
 		startPos := mysql.EncodePosition(uvs.pos)
 		vs := newVStreamer(ctx, uvs.cp, uvs.se, startPos, "", uvs.filter, uvs.getVSchema(), uvs.send2, "catchup", uvs.vse)
 		uvs.setVs(vs)
@@ -200,12 +210,24 @@ func getQRFromLastPK(fields []*querypb.Field, lastPK []sqltypes.Value) *querypb.
 }
 
 // gets batch of rows to copy. size of batch is determined by max packetsize
+//
+// The rows are streamed under a single consistent snapshot. If vstream_copy_phase_duration
+// elapses before all rows are streamed, the copy cycle ends: the snapshot is closed and copyTable
+// returns without completing the table. copy() then catches up on the binlog and calls copyTable
+// again, which resumes after the lastpk of the last sent rows with a new snapshot.
 func (uvs *uvstreamer) copyTable(ctx context.Context, tableName string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	defer func() {
 		uvs.vse.vstreamerPhaseTimings.Record("copy", time.Now())
 	}()
+
+	// cycleCtx bounds how long this copy cycle keeps its snapshot open
+	cycleCtx, endCycle := context.WithCancel(ctx)
+	if *copyPhaseDuration > 0 {
+		cycleCtx, endCycle = context.WithTimeout(ctx, *copyPhaseDuration)
+	}
+	defer endCycle()
 
 	var newLastPK *sqltypes.Result
 	lastPK := getLastPKFromQR(uvs.plans[tableName].tablePK.Lastpk)
@@ -214,9 +236,10 @@ func (uvs *uvstreamer) copyTable(ctx context.Context, tableName string) error {
 	log.Infof("Starting copyTable for %s, PK %v", tableName, lastPK)
 	uvs.sendTestEvent(fmt.Sprintf("Copy Start %s", tableName))
 
-	err := uvs.vse.StreamRows(ctx, filter, lastPK, func(rows *binlogdatapb.VStreamRowsResponse) error {
+	err := uvs.vse.StreamRows(cycleCtx, filter, lastPK, func(rows *binlogdatapb.VStreamRowsResponse) error {
 		select {
-		case <-ctx.Done():
+		case <-cycleCtx.Done():
+			// rows that are not sent do not advance lastpk, the next copy cycle streams them again
 			log.Infof("Returning io.EOF in StreamRows")
 			return io.EOF
 		default:
@@ -262,7 +285,7 @@ func (uvs *uvstreamer) copyTable(ctx context.Context, tableName string) error {
 		}
 
 		newLastPK = sqltypes.CustomProto3ToResult(uvs.pkfields, &querypb.QueryResult{
-			Fields: rows.Fields,
+			Fields: uvs.pkfields,
 			Rows:   []*querypb.Row{rows.Lastpk},
 		})
 		qrLastPK := sqltypes.ResultToProto3(newLastPK)
@@ -277,6 +300,12 @@ func (uvs *uvstreamer) copyTable(ctx context.Context, tableName string) error {
 		return nil
 	})
 	if err != nil {
+		if ctx.Err() == nil && cycleCtx.Err() != nil {
+			// The copy cycle ended and the rowstreamer closed its snapshot. The table is still the first
+			// one in tablesToCopy, so copy() catches up on the binlog and calls copyTable again.
+			log.Infof("Copy phase duration of %v elapsed: copy of %v paused at lastpk: %v", *copyPhaseDuration, tableName, newLastPK)
+			return nil
+		}
 		uvs.vse.errorCounts.Add("StreamRows", 1)
 		return err
 	}
