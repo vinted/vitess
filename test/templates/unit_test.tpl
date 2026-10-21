@@ -11,10 +11,6 @@ jobs:
       with:
         go-version: 1.16
 
-    - name: Tune the OS
-      run: |
-        echo '1024 65535' | sudo tee -a /proc/sys/net/ipv4/ip_local_port_range
-
     - name: Check out code
       uses: actions/checkout@v4
 

@@ -657,7 +657,9 @@ func TestServerStats(t *testing.T) {
 	assert.Contains(t, output, "ERROR 1047 (08S01)")
 	assert.Contains(t, output, "forced query error", "Unexpected output for 'error': %v", output)
 
-	assert.EqualValues(t, 0, connCount.Get(), "connCount")
+	// The server decrements connCount asynchronously when it notices that the
+	// client has gone away, so wait for it instead of checking immediately.
+	assert.Eventually(t, func() bool { return connCount.Get() == 0 }, 10*time.Second, 10*time.Millisecond, "connCount")
 	assert.EqualValues(t, 1, connAccept.Get(), "connAccept")
 	assert.EqualValues(t, 1, connSlow.Get(), "connSlow")
 	assert.EqualValues(t, 0, connRefuse.Get(), "connRefuse")
@@ -683,7 +685,7 @@ func TestServerStats(t *testing.T) {
 	assert.Contains(t, output, "ERROR 2013 (HY000)")
 	assert.Contains(t, output, "Lost connection to MySQL server during query", "Unexpected output for 'panic': %v", output)
 
-	assert.EqualValues(t, 0, connCount.Get(), "connCount")
+	assert.Eventually(t, func() bool { return connCount.Get() == 0 }, 10*time.Second, 10*time.Millisecond, "connCount")
 	assert.EqualValues(t, 2, connAccept.Get(), "connAccept")
 	assert.EqualValues(t, 1, connSlow.Get(), "connSlow")
 	assert.EqualValues(t, 0, connRefuse.Get(), "connRefuse")

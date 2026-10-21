@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -210,9 +211,41 @@ func tmpdir(dataroot string) (dir string, err error) {
 	return
 }
 
+// numPortsPerEnv is the number of consecutive ports a LocalTestEnv needs,
+// starting at BasePort (see PortForProtocol).
+const numPortsPerEnv = 4
+
+// randomPort returns a random base port in the range [10000, 30000). It checks
+// that the ports the environment is going to use can currently be bound, so
+// that a cluster started by one test is less likely to collide with ports used
+// by other tests that run in parallel (or with ephemeral ports of their
+// connections).
 func randomPort() int {
-	v := rand.Int31n(20000)
-	return int(v + 10000)
+	var port int
+	for i := 0; i < 100; i++ {
+		port = int(rand.Int31n(20000)) + 10000
+		if portsAreFree(port, numPortsPerEnv) {
+			break
+		}
+	}
+	return port
+}
+
+// RandomPort returns a random base port that is currently free. It is exported
+// for tests that need to pick a port for vttestserver themselves.
+func RandomPort() int {
+	return randomPort()
+}
+
+func portsAreFree(base, count int) bool {
+	for p := base; p < base+count; p++ {
+		l, err := net.Listen("tcp", fmt.Sprintf(":%d", p))
+		if err != nil {
+			return false
+		}
+		l.Close()
+	}
+	return true
 }
 
 // NewLocalTestEnv returns an instance of the default test environment used

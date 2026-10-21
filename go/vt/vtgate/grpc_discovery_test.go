@@ -40,7 +40,12 @@ import (
 // TestGRPCDiscovery tests the discovery gateway with a gRPC
 // connection from the gateway to the fake tablet.
 func TestGRPCDiscovery(t *testing.T) {
+	// The rest of this package expects the "sandbox" tablet protocol (see
+	// sandbox_test.go). Restore it, otherwise the TabletPicker used by the
+	// VStream tests tries to dial the fake tablets over gRPC and times out.
+	prevTabletProtocol := flag.Lookup("tablet_protocol").Value.String()
 	flag.Set("tablet_protocol", "grpc")
+	defer flag.Set("tablet_protocol", prevTabletProtocol)
 
 	// Fake services for the tablet, topo server.
 	service, ts, cell := CreateFakeServers(t)
