@@ -29,7 +29,7 @@ func TestInsertGenerator(t *testing.T) {
 	ig := NewInsertGenerator(binlogplayer.BlpStopped, "a")
 	ig.now = 111
 	ig.AddRow("b", &binlogdatapb.BinlogSource{Keyspace: "c"}, "d", "e", "f", binlogdatapb.VReplicationWorkflowType_Materialize)
-	want := `insert into _vt.vreplication(workflow, source, pos, max_tps, max_replication_lag, cell, tablet_types, time_updated, transaction_timestamp, state, db_name) values ` +
+	want := `insert into _vt.vreplication(workflow, source, pos, max_tps, max_replication_lag, cell, tablet_types, time_updated, transaction_timestamp, state, db_name, workflow_type) values ` +
 		`('b', 'keyspace:\"c\"', 'd', 9223372036854775807, 9223372036854775807, 'e', 'f', 111, 0, 'Stopped', 'a', 0)`
 	assert.Equal(t, ig.String(), want)
 

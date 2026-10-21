@@ -160,7 +160,7 @@ func TestBasicVreplicationWorkflow(t *testing.T) {
 		insert := "insert into customer (cid, name, typ, sport, meta) values (1000, NULL, 'soho', 'football','{}'), (1001, NULL, 'enterprise','baseball','{}')"
 		_, err = vtgateConn.ExecuteFetch(insert, -1, false)
 		require.NoError(t, err, "error executing %q: %v", insert, err)
-		err = vc.VtctlClient.ExecuteCommand("CreateLookupVindex", "--", "--tablet_types=MASTER", "customer", createLookupVindexVSchema)
+		err = vc.VtctlClient.ExecuteCommand("CreateLookupVindex", "-tablet_types=MASTER", "customer", createLookupVindexVSchema)
 		require.NoError(t, err, "error executing CreateLookupVindex: %v", err)
 		waitForWorkflowState(t, vc, "product.customer_name_keyspace_id_vdx", binlogplayer.BlpStopped)
 		validateCount(t, vtgateConn, "product", "customer_name_keyspace_id", int(rows))
