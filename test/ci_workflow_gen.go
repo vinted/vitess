@@ -28,8 +28,12 @@ import (
 const (
 	workflowConfigDir = "../.github/workflows"
 
-	unitTestTemplate  = "templates/unit_test.tpl"
-	unitTestDatabases = "percona56, mysql57, mysql80, mariadb101, mariadb102, mariadb103"
+	unitTestTemplate = "templates/unit_test.tpl"
+	// Only MySQL 8.0 is installable from the Ubuntu 22.04 archive and it is
+	// what Vinted runs in production. The MySQL 5.6/5.7 and MariaDB 10.x
+	// packages the upstream workflows relied on are no longer available on
+	// any GitHub-hosted runner.
+	unitTestDatabases = "mysql80"
 
 	clusterTestTemplate = "templates/cluster_endtoend_test.tpl"
 )
@@ -86,15 +90,22 @@ var (
 		"resharding_bytes",
 		"mysql80",
 	}
+	// Clusters that run on every push/pull request. All other clusters are
+	// generated with a manual (workflow_dispatch) trigger only: they were
+	// written for Ubuntu 18.04 + MySQL 5.7 and have not been verified against
+	// the MySQL 8.0 that current GitHub runners provide.
+	clustersOnPullRequest = []string{
+		"vreplication_basic",
+		"vstream_failover",
+		"vstream_stoponreshard_true",
+		"vstream_stoponreshard_false",
+	}
 	// TODO: currently some percona tools including xtrabackup are installed on all clusters, we can possibly optimize
 	// this by only installing them in the required clusters
 	clustersRequiringXtraBackup = clusterList
 	clustersRequiringMakeTools  = []string{
 		"18",
 		"24",
-	}
-	clustersRequiringUbuntu20 = []string{
-		"mysql80",
 	}
 )
 
@@ -105,7 +116,7 @@ type unitTest struct {
 type clusterTest struct {
 	Name, Shard                  string
 	MakeTools, InstallXtraBackup bool
-	Ubuntu20                     bool
+	OnPullRequest                bool
 }
 
 func mergeBlankLines(buf *bytes.Buffer) string {
@@ -171,10 +182,10 @@ func generateClusterWorkflows() {
 				break
 			}
 		}
-		ubuntu20Clusters := canonnizeList(clustersRequiringUbuntu20)
-		for _, ubuntu20Cluster := range ubuntu20Clusters {
-			if ubuntu20Cluster == cluster {
-				test.Ubuntu20 = true
+		pullRequestClusters := canonnizeList(clustersOnPullRequest)
+		for _, pullRequestCluster := range pullRequestClusters {
+			if pullRequestCluster == cluster {
+				test.OnPullRequest = true
 				break
 			}
 		}
