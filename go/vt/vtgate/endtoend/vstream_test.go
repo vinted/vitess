@@ -331,7 +331,14 @@ func TestVStreamCopyResume(t *testing.T) {
 					// Validate that the vgtid event the client receives from the vstream copy has a complete TableLastPK proto message.
 					// Also, to ensure that the client can resume properly, make sure that
 					// the Fields value is present in the sqltypes.Result field and not missing.
-					require.Regexp(t, `type:VGTID vgtid:{shard_gtids:{keyspace:"ks" shard:"-80" gtid:".+" table_p_ks:{table_name:"t1_copy_resume" lastpk:{fields:{name:"id1" type:INT64} rows:{lengths:1 values:"[0-9]"}}}} shard_gtids:{keyspace:"ks" shard:"80-" gtid:".+" table_p_ks:{table_name:"t1_copy_resume" lastpk:{fields:{name:"id1" type:INT64} rows:{lengths:1 values:"[0-9]"}}}}} keyspace:"ks" shard:"(80-|-80)"`, ev.String())
+					// It's not guaranteed that BOTH shards are still copying when a vgtid event is
+					// sent, as the order of events across shards is non-deterministic: a shard
+					// that has finished its copy no longer has table_p_ks. So only require that
+					// at least one shard has a complete TableLastPK proto message.
+					lastPK := `table_p_ks:{table_name:"t1_copy_resume" lastpk:{fields:{name:"id1" type:INT64} rows:{lengths:1 values:"[0-9]"}}}`
+					require.Regexp(t, `^type:VGTID vgtid:{shard_gtids:{keyspace:"ks" shard:"-80" gtid:".+?"( `+lastPK+`)?} shard_gtids:{keyspace:"ks" shard:"80-" gtid:".+?"( `+lastPK+`)?}} keyspace:"ks" shard:"(80-|-80)"$`, ev.String())
+					require.Contains(t, ev.String(), `lastpk:{fields:{name:"id1" type:INT64} rows:{lengths:1 values:"`,
+						"VGTID event does not have a complete TableLastPK proto message for either shard: %s", ev.String())
 				}
 			}
 			if expectedCatchupEvents == replCatchupEvents && expectedRowCopyEvents == rowCopyEvents {
