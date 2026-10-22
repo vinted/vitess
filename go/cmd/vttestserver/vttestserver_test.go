@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"path"
 	"strings"
@@ -311,7 +310,7 @@ func startPersistentCluster(dir string, flags ...string) (vttest.LocalCluster, e
 	flags = append(flags, []string{
 		"-persistent_mode",
 		// FIXME: if port is not provided, data_dir is not respected
-		fmt.Sprintf("-port=%d", randomPort()),
+		fmt.Sprintf("-port=%d", vttest.RandomPort()),
 		fmt.Sprintf("-data_dir=%s", dir),
 	}...)
 	return startCluster(flags...)
@@ -380,9 +379,4 @@ func assertEqual(t *testing.T, actual string, expected string, message string) {
 func resetFlags(args []string, conf vttest.Config) {
 	os.Args = args
 	config = conf
-}
-
-func randomPort() int {
-	v := rand.Int31n(20000)
-	return int(v + 10000)
 }

@@ -323,9 +323,10 @@ func TestSysInfo(t *testing.T) {
 	assert.Equal(t, `VARCHAR("NO")`, qr.Rows[0][8].String())
 	assert.Equal(t, `VARCHAR("NO")`, qr.Rows[1][8].String())
 
-	// table_name
-	assert.Equal(t, `VARCHAR("a")`, qr.Rows[0][10].String())
-	assert.Equal(t, `VARCHAR("a")`, qr.Rows[1][10].String())
+	// table_name. Depending on the MySQL 8.0 version and lower_case_table_names
+	// the column is reported as VARCHAR or VARBINARY, so only check the value.
+	assert.Equal(t, "a", qr.Rows[0][10].ToString())
+	assert.Equal(t, "a", qr.Rows[1][10].ToString())
 
 	assert.EqualValues(t, sqltypes.Uint64, qr.Fields[4].Type)
 	assert.EqualValues(t, querypb.Type_UINT64, qr.Rows[0][4].Type())

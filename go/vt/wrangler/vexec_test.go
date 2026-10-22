@@ -236,7 +236,7 @@ func TestWorkflowListStreams(t *testing.T) {
 					"TransactionTimestamp": 0,
 					"TimeUpdated": 1234,
 					"Message": "",
-					"WorkflowType": "Materialize"
+					"WorkflowType": "Materialize",
 					"CopyState": [
 						{
 							"Table": "t1",
@@ -272,7 +272,7 @@ func TestWorkflowListStreams(t *testing.T) {
 					"TransactionTimestamp": 0,
 					"TimeUpdated": 1234,
 					"Message": "",
-					"WorkflowType": "Materialize"
+					"WorkflowType": "Materialize",
 					"CopyState": [
 						{
 							"Table": "t1",

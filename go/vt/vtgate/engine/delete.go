@@ -42,14 +42,6 @@ type Delete struct {
 	noInputs
 }
 
-var delName = map[DMLOpcode]string{
-	Unsharded:     "DeleteUnsharded",
-	Equal:         "DeleteEqual",
-	In:            "DeleteIn",
-	Scatter:       "DeleteScatter",
-	ByDestination: "DeleteByDestination",
-}
-
 // Execute performs a non-streaming exec.
 func (del *Delete) Execute(vcursor VCursor, bindVars map[string]*querypb.BindVariable, _ bool) (*sqltypes.Result, error) {
 	if del.QueryTimeout != 0 {

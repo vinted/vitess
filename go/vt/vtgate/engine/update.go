@@ -54,14 +54,6 @@ type Update struct {
 	noInputs
 }
 
-var updName = map[DMLOpcode]string{
-	Unsharded:     "UpdateUnsharded",
-	Equal:         "UpdateEqual",
-	In:            "UpdateIn",
-	Scatter:       "UpdateScatter",
-	ByDestination: "UpdateByDestination",
-}
-
 // Execute performs a non-streaming exec.
 func (upd *Update) Execute(vcursor VCursor, bindVars map[string]*querypb.BindVariable, wantfields bool) (*sqltypes.Result, error) {
 	if upd.QueryTimeout != 0 {

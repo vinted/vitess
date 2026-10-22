@@ -514,7 +514,7 @@ func TestPickErrorOnlySpecified(t *testing.T) {
 func TestPickFallbackType(t *testing.T) {
 	cells := []string{"cell1", "cell2"}
 	localCell := cells[0]
-	tabletTypes := "replica,primary"
+	tabletTypes := "replica,master"
 	options := TabletPickerOptions{
 		TabletOrder: "InOrder",
 	}

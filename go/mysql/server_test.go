@@ -657,7 +657,9 @@ func TestServerStats(t *testing.T) {
 	assert.Contains(t, output, "ERROR 1047 (08S01)")
 	assert.Contains(t, output, "forced query error", "Unexpected output for 'error': %v", output)
 
-	assert.EqualValues(t, 0, connCount.Get(), "connCount")
+	// The server decrements connCount asynchronously when it notices that the
+	// client has gone away, so wait for it instead of checking immediately.
+	assert.Eventually(t, func() bool { return connCount.Get() == 0 }, 10*time.Second, 10*time.Millisecond, "connCount")
 	assert.EqualValues(t, 1, connAccept.Get(), "connAccept")
 	assert.EqualValues(t, 1, connSlow.Get(), "connSlow")
 	assert.EqualValues(t, 0, connRefuse.Get(), "connRefuse")
@@ -683,7 +685,7 @@ func TestServerStats(t *testing.T) {
 	assert.Contains(t, output, "ERROR 2013 (HY000)")
 	assert.Contains(t, output, "Lost connection to MySQL server during query", "Unexpected output for 'panic': %v", output)
 
-	assert.EqualValues(t, 0, connCount.Get(), "connCount")
+	assert.Eventually(t, func() bool { return connCount.Get() == 0 }, 10*time.Second, 10*time.Millisecond, "connCount")
 	assert.EqualValues(t, 2, connAccept.Get(), "connAccept")
 	assert.EqualValues(t, 1, connSlow.Get(), "connSlow")
 	assert.EqualValues(t, 0, connRefuse.Get(), "connRefuse")
@@ -1204,9 +1206,13 @@ func TestListenerShutdown(t *testing.T) {
 	err = conn.Ping()
 	require.NoError(t, err)
 
+	// connRefuse is a global counter that the Accept loop of a listener bumps
+	// when it exits, so listeners closed by earlier tests can still increment
+	// it concurrently. Check that this listener's shutdown is counted,
+	// asynchronously.
+	connRefuseBefore := connRefuse.Get()
 	l.Shutdown()
-
-	assert.EqualValues(t, 1, connRefuse.Get(), "connRefuse")
+	assert.Eventually(t, func() bool { return connRefuse.Get() > connRefuseBefore }, 10*time.Second, 10*time.Millisecond, "connRefuse")
 
 	err = conn.Ping()
 	require.EqualError(t, err, "Server shutdown in progress (errno 1053) (sqlstate 08S01)")

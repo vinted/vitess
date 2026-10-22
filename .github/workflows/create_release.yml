@@ -1,50 +1,120 @@
-# This creates a {tar.gz,deb,rpm} file and uploads it to a release.
-# To trigger this, create a new release.. but make sure that you publish
-# it immediately and do not save it as a DRAFT.
+# Builds the Vitess binaries from the selected branch and publishes them as a
+# GitHub release of this repository, following
+# https://github.com/vinted/devbook/blob/master/sre/vitess/vitess_code/build_custom_release.md#build-packages
+#
+# Run it from the Actions tab ("Run workflow"), choosing the branch to build
+# from. The release is tagged <version>[-patch<N>]-<revision>, e.g.
+# 11.0.4-5d8fa9a or 11.0.4-patch10-5d8fa9a, and contains
+# vitess-<identifier>.tar.gz (a vitess-<identifier>/bin/ directory with the
+# linux/amd64 binaries) together with its SHA256 checksum.
 
-name: Release
+name: Create Release
 on:
-  release:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      patch:
+        description: 'Patch number, for a patch release (e.g. 10 for 11.0.4-patch10-<revision>). Leave empty for a regular release.'
+        required: false
+        default: ''
+      draft:
+        description: 'Create the release as a draft'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
 
 jobs:
-  build:
-    name: Create Release
-    runs-on: ubuntu-latest
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-22.04
     steps:
 
     - name: Set up Go
-      uses: actions/setup-go@v1
+      uses: actions/setup-go@v5
       with:
         go-version: 1.16
 
-    - name: Tune the OS
-      run: |
-        echo '1024 65535' | sudo tee -a /proc/sys/net/ipv4/ip_local_port_range
-
-    # TEMPORARY WHILE GITHUB FIXES THIS https://github.com/actions/virtual-environments/issues/3185
-    - name: Add the current IP address, long hostname and short hostname record to /etc/hosts file
-      run: |
-        echo -e "$(ip addr show eth0 | grep "inet\b" | awk '{print $2}' | cut -d/ -f1)\t$(hostname -f) $(hostname -s)" | sudo tee -a /etc/hosts
-    # DON'T FORGET TO REMOVE CODE ABOVE WHEN ISSUE IS ADRESSED!
-
     - name: Check out code
-      uses: actions/checkout@v2
-
-    - name: Get dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y make ruby ruby-dev
-        go mod download
-        sudo gem install fpm
-
-    - name: Make Packages
-      run: |
-        ./tools/make-release-packages.sh
-
-    - name: Upload Files
-      uses: csexton/release-asset-action@master
+      uses: actions/checkout@v4
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        pattern: "releases/*.{tar.gz,rpm,deb}"
+        # tools/build_version_flags.sh embeds the git revision and branch
+        # into the binaries (shown by `vttablet -version`).
+        fetch-depth: 0
 
+    - name: Build binaries
+      run: |
+        make clean
+        make build
+
+    - name: Construct release identifier
+      id: identifier
+      run: |
+        set -euo pipefail
+        # Pick the version and git revision from the built binaries, e.g.
+        # "Version: 11.0.4 (Git revision 5d8fa9a branch 'vinted/...') built on ..."
+        version_line="$(./bin/vttablet -version)"
+        echo "${version_line}"
+        version="$(echo "${version_line}" | sed -E 's/^Version: ([^ ]+) .*/\1/')"
+        revision="$(echo "${version_line}" | sed -E 's/.*Git revision ([0-9a-f]+) .*/\1/')"
+        patch="${{ github.event.inputs.patch }}"
+        if [ -n "${patch}" ]; then
+          identifier="${version}-patch${patch}-${revision}"
+        else
+          identifier="${version}-${revision}"
+        fi
+        echo "identifier=${identifier}" >> "${GITHUB_OUTPUT}"
+        echo "Release identifier: ${identifier}"
+
+    - name: Create release package
+      id: package
+      env:
+        IDENTIFIER: ${{ steps.identifier.outputs.identifier }}
+      run: |
+        set -euo pipefail
+        release_dir="${RUNNER_TEMP}/vitess-${IDENTIFIER}"
+        rm -rf "${release_dir}"
+        mkdir -p "${release_dir}/bin"
+        # Remove broken symlinks (build.env links scripts from the source
+        # tree into bin/) and copy the binaries.
+        find bin -xtype l -delete
+        cp -RL bin/. "${release_dir}/bin/"
+        ls -la "${release_dir}/bin"
+        cd "${RUNNER_TEMP}"
+        tar -czf "vitess-${IDENTIFIER}.tar.gz" "vitess-${IDENTIFIER}"
+        sha256sum "vitess-${IDENTIFIER}.tar.gz" | tee "vitess-${IDENTIFIER}.tar.gz.sha256"
+        echo "tarball=${RUNNER_TEMP}/vitess-${IDENTIFIER}.tar.gz" >> "${GITHUB_OUTPUT}"
+        echo "checksum_file=${RUNNER_TEMP}/vitess-${IDENTIFIER}.tar.gz.sha256" >> "${GITHUB_OUTPUT}"
+        echo "sha256=$(cut -d' ' -f1 "vitess-${IDENTIFIER}.tar.gz.sha256")" >> "${GITHUB_OUTPUT}"
+
+    - name: Create GitHub release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        IDENTIFIER: ${{ steps.identifier.outputs.identifier }}
+        SHA256: ${{ steps.package.outputs.sha256 }}
+        TARBALL: ${{ steps.package.outputs.tarball }}
+        CHECKSUM_FILE: ${{ steps.package.outputs.checksum_file }}
+        DRAFT: ${{ github.event.inputs.draft }}
+      run: |
+        set -euo pipefail
+        notes="$(cat <<EOF
+        Vitess ${IDENTIFIER} built from branch \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA}.
+
+        Package: \`vitess-${IDENTIFIER}.tar.gz\`
+        SHA256: \`${SHA256}\`
+
+        Built by ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+        EOF
+        )"
+        draft_flag=""
+        if [ "${DRAFT}" = "true" ]; then
+          draft_flag="--draft"
+        fi
+        gh release create "${IDENTIFIER}" \
+          --repo "${GITHUB_REPOSITORY}" \
+          --target "${GITHUB_SHA}" \
+          --title "Vitess ${IDENTIFIER}" \
+          --notes "${notes}" \
+          ${draft_flag} \
+          "${TARBALL}" "${CHECKSUM_FILE}"

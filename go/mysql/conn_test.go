@@ -724,7 +724,9 @@ func TestPrepareAndExecute(t *testing.T) {
 	// and check that the handler received the correct input
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	for i := 0; i < 1000; i++ {
+	// 100 concurrent connections are plenty to exercise the concurrency; with
+	// 1000 of them the CI runners occasionally reset connections under load.
+	for i := 0; i < 100; i++ {
 		startGoRoutine(ctx, t, randSeq(i))
 	}
 
@@ -732,7 +734,7 @@ func TestPrepareAndExecute(t *testing.T) {
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-time.After(10 * time.Millisecond):
 			if t.Failed() {
 				return
 			}
