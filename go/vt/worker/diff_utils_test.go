@@ -51,7 +51,7 @@ func TestUint64FromKeyspaceId(t *testing.T) {
 			continue
 		}
 		if got := uint64FromKeyspaceID(keyspaceID); got != want {
-			t.Errorf("uint64FromKeyspaceID(%v) = %q, want %q", input, got, want)
+			t.Errorf("uint64FromKeyspaceID(%v) = %v, want %v", input, got, want)
 		}
 	}
 }

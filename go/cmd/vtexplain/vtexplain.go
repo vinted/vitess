@@ -97,7 +97,7 @@ func flagUsage(f *flag.Flag) {
 	} else {
 		s += fmt.Sprintf(" (default %v)", f.DefValue)
 	}
-	fmt.Printf(s + "\n")
+	fmt.Println(s)
 }
 
 func init() {

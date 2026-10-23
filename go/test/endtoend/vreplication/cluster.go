@@ -190,7 +190,7 @@ func (vc *VitessCluster) AddKeyspace(t *testing.T, cells []*Cell, ksName string,
 	}
 
 	if err := vc.Vtctl.CreateKeyspace(keyspace.Name); err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 	cellsToWatch := ""
 	for i, cell := range cells {
@@ -204,13 +204,13 @@ func (vc *VitessCluster) AddKeyspace(t *testing.T, cells []*Cell, ksName string,
 
 	if schema != "" {
 		if err := vc.VtctlClient.ApplySchema(ksName, schema); err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err)
 		}
 	}
 	keyspace.Schema = schema
 	if vschema != "" {
 		if err := vc.VtctlClient.ApplyVSchema(ksName, vschema); err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err)
 		}
 	}
 	keyspace.VSchema = vschema
@@ -344,7 +344,7 @@ func (vc *VitessCluster) AddShards(t testing.TB, cells []*Cell, keyspace *Keyspa
 				}
 				log.Infof("Running Setup() for vttablet %s", tablets[ind].Name)
 				if err := tablet.Vttablet.Setup(); err != nil {
-					t.Fatalf(err.Error())
+					t.Fatal(err)
 				}
 			}
 		}
@@ -387,7 +387,7 @@ func (vc *VitessCluster) StartVtgate(t testing.TB, cell *Cell, cellsToWatch stri
 		[]string{"-tablet_refresh_interval", "10ms"})
 	require.NotNil(t, vtgate)
 	if err := vtgate.Setup(); err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 	cell.Vtgates = append(cell.Vtgates, vtgate)
 }
