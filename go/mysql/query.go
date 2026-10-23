@@ -47,7 +47,7 @@ func (c *Conn) WriteComQuery(query string) error {
 	pos++
 	copy(data[pos:], query)
 	if err := c.writeEphemeralPacket(); err != nil {
-		return NewSQLError(CRServerGone, SSUnknownSQLState, "%v", err)
+		return NewSQLError(CRServerGone, SSUnknownSQLState, "%s", err.Error())
 	}
 	return nil
 }
@@ -61,7 +61,7 @@ func (c *Conn) writeComInitDB(db string) error {
 	pos++
 	copy(data[pos:], db)
 	if err := c.writeEphemeralPacket(); err != nil {
-		return NewSQLError(CRServerGone, SSUnknownSQLState, "%v", err)
+		return NewSQLError(CRServerGone, SSUnknownSQLState, "%s", err.Error())
 	}
 	return nil
 }
@@ -74,7 +74,7 @@ func (c *Conn) writeComSetOption(operation uint16) error {
 	pos++
 	writeUint16(data, pos, operation)
 	if err := c.writeEphemeralPacket(); err != nil {
-		return NewSQLError(CRServerGone, SSUnknownSQLState, "%v", err)
+		return NewSQLError(CRServerGone, SSUnknownSQLState, "%s", err.Error())
 	}
 	return nil
 }
