@@ -193,7 +193,7 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 			strings.Replace(hint, "%", "%%", -1), // escape %
 			err)
 	}
-	return log.Errorf(msg)
+	return log.Errorf("%s", msg)
 }
 
 // ReadTopologyInstance collects information on the state of a MySQL
@@ -900,9 +900,9 @@ func (this byNamePort) Less(i, j int) bool {
 }
 
 // BulkReadInstance returns a list of all instances from the database
-// - I only need the Hostname and Port fields.
-// - I must use readInstancesByCondition to ensure all column
-//   settings are correct.
+//   - I only need the Hostname and Port fields.
+//   - I must use readInstancesByCondition to ensure all column
+//     settings are correct.
 func BulkReadInstance() ([](*InstanceKey), error) {
 	// no condition (I want all rows) and no sorting (but this is done by Hostname, Port anyway)
 	const (

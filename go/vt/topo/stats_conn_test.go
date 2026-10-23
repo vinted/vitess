@@ -99,7 +99,7 @@ func (st *fakeConn) NewMasterParticipation(name, id string) (mp MasterParticipat
 func (st *fakeConn) Close() {
 }
 
-//TestStatsConnTopoListDir emits stats on ListDir
+// TestStatsConnTopoListDir emits stats on ListDir
 func TestStatsConnTopoListDir(t *testing.T) {
 	conn := &fakeConn{}
 	statsConn := NewStatsConn("global", conn)
@@ -126,7 +126,7 @@ func TestStatsConnTopoListDir(t *testing.T) {
 	}
 }
 
-//TestStatsConnTopoCreate emits stats on Create
+// TestStatsConnTopoCreate emits stats on Create
 func TestStatsConnTopoCreate(t *testing.T) {
 	conn := &fakeConn{}
 	statsConn := NewStatsConn("global", conn)
@@ -153,7 +153,7 @@ func TestStatsConnTopoCreate(t *testing.T) {
 	}
 }
 
-//TestStatsConnTopoUpdate emits stats on Update
+// TestStatsConnTopoUpdate emits stats on Update
 func TestStatsConnTopoUpdate(t *testing.T) {
 	conn := &fakeConn{}
 	statsConn := NewStatsConn("global", conn)
@@ -180,7 +180,7 @@ func TestStatsConnTopoUpdate(t *testing.T) {
 	}
 }
 
-//TestStatsConnTopoGet emits stats on Get
+// TestStatsConnTopoGet emits stats on Get
 func TestStatsConnTopoGet(t *testing.T) {
 	conn := &fakeConn{}
 	statsConn := NewStatsConn("global", conn)
@@ -207,7 +207,7 @@ func TestStatsConnTopoGet(t *testing.T) {
 	}
 }
 
-//TestStatsConnTopoDelete emits stats on Delete
+// TestStatsConnTopoDelete emits stats on Delete
 func TestStatsConnTopoDelete(t *testing.T) {
 	conn := &fakeConn{}
 	statsConn := NewStatsConn("global", conn)
@@ -234,7 +234,7 @@ func TestStatsConnTopoDelete(t *testing.T) {
 	}
 }
 
-//TestStatsConnTopoLock emits stats on Lock
+// TestStatsConnTopoLock emits stats on Lock
 func TestStatsConnTopoLock(t *testing.T) {
 	conn := &fakeConn{}
 	statsConn := NewStatsConn("global", conn)
@@ -261,7 +261,7 @@ func TestStatsConnTopoLock(t *testing.T) {
 	}
 }
 
-//TestStatsConnTopoWatch emits stats on Watch
+// TestStatsConnTopoWatch emits stats on Watch
 func TestStatsConnTopoWatch(t *testing.T) {
 	conn := &fakeConn{}
 	statsConn := NewStatsConn("global", conn)
@@ -275,7 +275,7 @@ func TestStatsConnTopoWatch(t *testing.T) {
 
 }
 
-//TestStatsConnTopoNewMasterParticipation emits stats on NewMasterParticipation
+// TestStatsConnTopoNewMasterParticipation emits stats on NewMasterParticipation
 func TestStatsConnTopoNewMasterParticipation(t *testing.T) {
 	conn := &fakeConn{}
 	statsConn := NewStatsConn("global", conn)
@@ -301,7 +301,7 @@ func TestStatsConnTopoNewMasterParticipation(t *testing.T) {
 	}
 }
 
-//TestStatsConnTopoClose emits stats on Close
+// TestStatsConnTopoClose emits stats on Close
 func TestStatsConnTopoClose(t *testing.T) {
 	conn := &fakeConn{}
 	statsConn := NewStatsConn("global", conn)

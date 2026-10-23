@@ -174,7 +174,9 @@ func testClientServer(t *testing.T, combineCerts bool) {
 	if err == nil {
 		t.Fatalf("Dial or first Read was expected to fail")
 	}
-	if !strings.Contains(err.Error(), "bad certificate") {
+	// TLS 1.2 reports a missing client certificate as "bad certificate",
+	// TLS 1.3 (used by default since Go 1.13) as "certificate required".
+	if !strings.Contains(err.Error(), "bad certificate") && !strings.Contains(err.Error(), "certificate required") {
 		t.Errorf("Wrong error returned: %v", err)
 	}
 }

@@ -61,7 +61,7 @@ var (
 `
 )
 
-//region cluster setup/teardown
+// region cluster setup/teardown
 func setupRangeBasedCluster(ctx context.Context, t *testing.T) {
 	tablets := setupCluster(ctx, t, shardName, []string{cell1}, []int{2})
 	masterTablet, replicaTablet = tablets[0], tablets[1]
@@ -188,7 +188,7 @@ func setupShard(ctx context.Context, t *testing.T, shardName string, tablets []*
 
 //endregion
 
-//region database queries
+// region database queries
 func getMysqlConnParam(tablet *cluster.Vttablet) mysql.ConnParams {
 	connParams := mysql.ConnParams{
 		Uname:      username,
@@ -327,7 +327,7 @@ func confirmOldMasterIsHangingAround(t *testing.T) {
 	require.Contains(t, out, "already has master")
 }
 
-//	Waits for tablet B to catch up to the replication position of tablet A.
+// Waits for tablet B to catch up to the replication position of tablet A.
 func waitForReplicationPosition(t *testing.T, tabletA *cluster.Vttablet, tabletB *cluster.Vttablet) error {
 	posA, _ := cluster.GetMasterPosition(t, *tabletA, hostname)
 	timeout := time.Now().Add(5 * time.Second)

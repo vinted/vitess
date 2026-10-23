@@ -255,7 +255,7 @@ func TestPrepareRollback(t *testing.T) {
 	err = client.Prepare("aa")
 	if err != nil {
 		client.RollbackPrepared("aa", 0)
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 	err = client.RollbackPrepared("aa", 0)
 	require.NoError(t, err)

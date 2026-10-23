@@ -50,7 +50,7 @@ func TestVrLog(t *testing.T) {
 
 	want := fmt.Sprintf("%s Event	%s", eventType, detail)
 	if !strings.Contains(s, want) {
-		t.Fatalf(fmt.Sprintf("want %s, got %s", want, s))
+		t.Fatalf("want %s, got %s", want, s)
 	}
 	if strings.HasSuffix(s, "\\n") {
 		t.Fatalf("does not end in a newline: %s", s)

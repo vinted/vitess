@@ -465,7 +465,7 @@ func (hw *horizontalReshardingWorkflow) runWorkflow() error {
 
 func (hw *horizontalReshardingWorkflow) setUIMessage(message string) {
 	log.Infof("Horizontal resharding : %v.", message)
-	hw.logger.Infof(message)
+	hw.logger.Infof("%s", message)
 	hw.rootUINode.Log = hw.logger.String()
 	hw.rootUINode.Message = message
 	hw.rootUINode.BroadcastChanges(false /* updateChildren */)

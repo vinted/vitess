@@ -760,11 +760,11 @@ func checkQueryInternal(t *testing.T, query string, sConn, cConn *Conn, result *
 	wg.Wait()
 
 	if fatalError != "" {
-		t.Fatalf(fatalError)
+		t.Fatal(fatalError)
 	}
 }
 
-//nolint
+// nolint
 func writeResult(conn *Conn, result *sqltypes.Result) error {
 	if len(result.Fields) == 0 {
 		return conn.writeOKPacket(&PacketOK{

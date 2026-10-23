@@ -1,3 +1,5 @@
+//go:build gofuzz
+
 /*
 Copyright 2021 The Vitess Authors.
 
@@ -13,7 +15,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// +build gofuzz
 
 package fuzzing
 
@@ -118,19 +119,24 @@ func getCommandType(index int) string {
 }
 
 /*
-	In this fuzzer we split the input into 3 chunks:
-	1: the first byte - Is converted to an int, and
-	   that int determines the number of command-line
-	   calls the fuzzer will make.
-	2: The next n bytes where n is equal to the int from
-	   the first byte. These n bytes are converted to
-	   a corresponding command and represent which
-	   commands will be called.
-	3: The rest of the data array should have a length
-	   that is divisible by the number of calls.
-	   This part is split up into equally large chunks,
-	   and each chunk is used as parameters for the
-	   corresponding command.
+In this fuzzer we split the input into 3 chunks:
+1: the first byte - Is converted to an int, and
+
+	that int determines the number of command-line
+	calls the fuzzer will make.
+
+2: The next n bytes where n is equal to the int from
+
+	the first byte. These n bytes are converted to
+	a corresponding command and represent which
+	commands will be called.
+
+3: The rest of the data array should have a length
+
+	that is divisible by the number of calls.
+	This part is split up into equally large chunks,
+	and each chunk is used as parameters for the
+	corresponding command.
 */
 func Fuzz(data []byte) int {
 

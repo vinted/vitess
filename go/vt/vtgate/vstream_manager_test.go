@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -404,7 +405,7 @@ func TestVStreamRetriableErrors(t *testing.T) {
 
 			// Always have the local cell tablet error so it's ignored on retry and we pick the other one
 			// if the error requires ignoring the tablet on retry.
-			sbc0.AddVStreamEvents(nil, vterrors.Errorf(tcase.code, tcase.msg))
+			sbc0.AddVStreamEvents(nil, vterrors.New(tcase.code, tcase.msg))
 
 			if tcase.ignoreTablet {
 				sbc1.AddVStreamEvents(commit, nil)
@@ -486,7 +487,9 @@ func TestVStreamRetry(t *testing.T) {
 	sbc0.AddVStreamEvents(nil, vterrors.Errorf(vtrpcpb.Code_FAILED_PRECONDITION, "bb"))
 	sbc0.AddVStreamEvents(nil, vterrors.Errorf(vtrpcpb.Code_FAILED_PRECONDITION, "cc"))
 	sbc0.AddVStreamEvents(nil, vterrors.Errorf(vtrpcpb.Code_FAILED_PRECONDITION, "final error"))
-	count := 0
+	// count is incremented from the vstream send goroutine and read by the
+	// test, so it must be accessed atomically.
+	var count int32
 	vgtid := &binlogdatapb.VGtid{
 		ShardGtids: []*binlogdatapb.ShardGtid{{
 			Keyspace: ks,
@@ -495,7 +498,7 @@ func TestVStreamRetry(t *testing.T) {
 		}},
 	}
 	err := vsm.VStream(ctx, topodatapb.TabletType_MASTER, vgtid, nil, &vtgatepb.VStreamFlags{}, func(events []*binlogdatapb.VEvent) error {
-		count++
+		atomic.AddInt32(&count, 1)
 		return nil
 	})
 	wantErr := "final error"
@@ -503,7 +506,7 @@ func TestVStreamRetry(t *testing.T) {
 		t.Errorf("vstream end: %v, must contain %v", err.Error(), wantErr)
 	}
 	time.Sleep(100 * time.Millisecond) // wait for goroutine within VStream to finish
-	assert.Equal(t, 2, count)
+	assert.Equal(t, int32(2), atomic.LoadInt32(&count))
 }
 
 func TestVStreamShouldNotSendSourceHeartbeats(t *testing.T) {

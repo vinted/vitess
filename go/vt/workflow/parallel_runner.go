@@ -416,7 +416,7 @@ func (p *ParallelRunner) setFinishUIMessage(taskID string) {
 }
 
 func (p *ParallelRunner) setUIMessage(message string) {
-	p.uiLogger.Infof(message)
+	p.uiLogger.Infof("%s", message)
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -430,7 +430,7 @@ func VerifyAllTasksDone(ctx context.Context, ts *topo.Server, uuid string) error
 	return verifyAllTasksState(ctx, ts, uuid, workflowpb.TaskState_TaskDone)
 }
 
-//verifyAllTasksState verifies that all tasks are in taskState. Only for tests purposes.
+// verifyAllTasksState verifies that all tasks are in taskState. Only for tests purposes.
 func verifyAllTasksState(ctx context.Context, ts *topo.Server, uuid string, taskState workflowpb.TaskState) error {
 	checkpoint, err := checkpoint(ctx, ts, uuid)
 	if err != nil {

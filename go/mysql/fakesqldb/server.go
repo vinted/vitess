@@ -394,7 +394,7 @@ func (db *DB) HandleQuery(c *mysql.Conn, query string, callback func(*sqltypes.R
 				userCallback(query)
 			}
 			if pat.err != "" {
-				return fmt.Errorf(pat.err)
+				return errors.New(pat.err)
 			}
 			return callback(pat.result)
 		}

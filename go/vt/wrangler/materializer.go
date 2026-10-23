@@ -17,6 +17,7 @@ limitations under the License.
 package wrangler
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"math"
@@ -235,7 +236,7 @@ func (wr *Wrangler) MoveTables(ctx context.Context, workflow, sourceKeyspace, ta
 				migrationID, strings.Join(tablets, ","))
 			msg += fmt.Sprintf("please review and delete it before proceeding and restart the workflow using the Workflow %s.%s start",
 				workflow, targetKeyspace)
-			return fmt.Errorf(msg)
+			return errors.New(msg)
 		}
 	}
 	if autoStart {

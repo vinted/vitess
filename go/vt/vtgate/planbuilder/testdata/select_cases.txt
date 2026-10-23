@@ -484,7 +484,7 @@ Gen4 plan same as above
     "Query": "select * from pin_test",
     "Table": "pin_test",
     "Values": [
-      "\ufffd"
+      "�"
     ],
     "Vindex": "binary"
   }

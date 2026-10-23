@@ -242,7 +242,7 @@ func TestJSONOutput(t *testing.T) {
 }`
 	diff := cmp.Diff(wantJSON, string(actionsJSON))
 	if diff != "" {
-		t.Errorf(diff)
+		t.Error(diff)
 	}
 }
 

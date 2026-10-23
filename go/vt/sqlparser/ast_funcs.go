@@ -332,7 +332,7 @@ func (node *AliasedTableExpr) RemoveHints() *AliasedTableExpr {
 	return &noHints
 }
 
-//TableName returns a TableName pointing to this table expr
+// TableName returns a TableName pointing to this table expr
 func (node *AliasedTableExpr) TableName() (TableName, error) {
 	if !node.As.IsEmpty() {
 		return TableName{Name: node.As}, nil
@@ -556,7 +556,7 @@ func NewColNameWithQualifier(identifier string, table TableName) *ColName {
 	}
 }
 
-//NewSelect is used to create a select statement
+// NewSelect is used to create a select statement
 func NewSelect(comments Comments, exprs SelectExprs, selectOptions []string, from TableExprs, where *Where, groupBy GroupBy, having *Where) *Select {
 	var cache *bool
 	var distinct, straightJoinHint, sqlFoundRows bool
@@ -860,7 +860,7 @@ func (node *Union) MakeDistinct() {
 	node.UnionSelects[len(node.UnionSelects)-1].Distinct = true
 }
 
-//Unionize returns a UNION, either creating one or adding SELECT to an existing one
+// Unionize returns a UNION, either creating one or adding SELECT to an existing one
 func Unionize(lhs, rhs SelectStatement, distinct bool, by OrderBy, limit *Limit, lock Lock) *Union {
 	union, isUnion := lhs.(*Union)
 	if isUnion {

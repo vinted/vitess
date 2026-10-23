@@ -249,7 +249,7 @@ func Exists(m Match, p Primitive) bool {
 	return Find(m, p) != nil
 }
 
-//MarshalJSON serializes the plan into a JSON representation.
+// MarshalJSON serializes the plan into a JSON representation.
 func (p *Plan) MarshalJSON() ([]byte, error) {
 	var instructions *PrimitiveDescription
 	if p.Instructions != nil {

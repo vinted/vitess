@@ -197,7 +197,7 @@ func logEntry(logLevel LogLevel, message string, args ...interface{}) string {
 	for _, s := range args {
 		entryString += fmt.Sprintf(" %s", s)
 	}
-	return logDepth(logLevel, 1, entryString)
+	return logDepth(logLevel, 1, "%s", entryString)
 }
 
 // logErrorEntry emits a log entry based on given error object

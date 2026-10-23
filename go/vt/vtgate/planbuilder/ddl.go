@@ -145,17 +145,17 @@ func buildDDLPlans(sql string, ddlStatement sqlparser.DDLStatement, reservedVars
 	}
 
 	return &engine.Send{
-			Keyspace:          keyspace,
-			TargetDestination: destination,
-			Query:             query,
-			IsDML:             false,
-			SingleShardOnly:   false,
-		}, &engine.OnlineDDL{
-			Keyspace:          keyspace,
-			TargetDestination: destination,
-			DDL:               ddlStatement,
-			SQL:               query,
-		}, nil
+		Keyspace:          keyspace,
+		TargetDestination: destination,
+		Query:             query,
+		IsDML:             false,
+		SingleShardOnly:   false,
+	}, &engine.OnlineDDL{
+		Keyspace:          keyspace,
+		TargetDestination: destination,
+		DDL:               ddlStatement,
+		SQL:               query,
+	}, nil
 }
 
 func checkFKError(vschema ContextVSchema, ddlStatement sqlparser.DDLStatement) error {

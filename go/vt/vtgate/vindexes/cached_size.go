@@ -17,11 +17,7 @@ limitations under the License.
 
 package vindexes
 
-import (
-	"math"
-	"reflect"
-	"unsafe"
-)
+import hack "vitess.io/vitess/go/hack"
 
 type cachedObject interface {
 	CachedSize(alloc bool) int64
@@ -91,7 +87,7 @@ func (cached *Column) CachedSize(alloc bool) int64 {
 	}
 	size := int64(0)
 	if alloc {
-		size += int64(44)
+		size += int64(48)
 	}
 	// field Name vitess.io/vitess/go/vt/sqlparser.ColIdent
 	size += cached.Name.CachedSize(false)
@@ -164,7 +160,7 @@ func (cached *Keyspace) CachedSize(alloc bool) int64 {
 	}
 	size := int64(0)
 	if alloc {
-		size += int64(17)
+		size += int64(24)
 	}
 	// field Name string
 	size += int64(len(cached.Name))
@@ -292,14 +288,7 @@ func (cached *NumericStaticMap) CachedSize(alloc bool) int64 {
 	size += int64(len(cached.name))
 	// field lookup vitess.io/vitess/go/vt/vtgate/vindexes.NumericLookupTable
 	if cached.lookup != nil {
-		size += int64(48)
-		hmap := reflect.ValueOf(cached.lookup)
-		numBuckets := int(math.Pow(2, float64((*(*uint8)(unsafe.Pointer(hmap.Pointer() + uintptr(9)))))))
-		numOldBuckets := (*(*uint16)(unsafe.Pointer(hmap.Pointer() + uintptr(10))))
-		size += int64(numOldBuckets * 144)
-		if len(cached.lookup) > 0 || numBuckets > 1 {
-			size += int64(numBuckets * 144)
-		}
+		size += hack.RuntimeMapSize(cached.lookup)
 	}
 	return size
 }
@@ -329,14 +318,7 @@ func (cached *RegionJSON) CachedSize(alloc bool) int64 {
 	size += int64(len(cached.name))
 	// field regionMap vitess.io/vitess/go/vt/vtgate/vindexes.RegionMap
 	if cached.regionMap != nil {
-		size += int64(48)
-		hmap := reflect.ValueOf(cached.regionMap)
-		numBuckets := int(math.Pow(2, float64((*(*uint8)(unsafe.Pointer(hmap.Pointer() + uintptr(9)))))))
-		numOldBuckets := (*(*uint16)(unsafe.Pointer(hmap.Pointer() + uintptr(10))))
-		size += int64(numOldBuckets * 208)
-		if len(cached.regionMap) > 0 || numBuckets > 1 {
-			size += int64(numBuckets * 208)
-		}
+		size += hack.RuntimeMapSize(cached.regionMap)
 		for k := range cached.regionMap {
 			size += int64(len(k))
 		}
@@ -361,7 +343,7 @@ func (cached *Table) CachedSize(alloc bool) int64 {
 	}
 	size := int64(0)
 	if alloc {
-		size += int64(169)
+		size += int64(176)
 	}
 	// field Type string
 	size += int64(len(cached.Type))
@@ -394,7 +376,7 @@ func (cached *Table) CachedSize(alloc bool) int64 {
 	size += cached.AutoIncrement.CachedSize(true)
 	// field Columns []vitess.io/vitess/go/vt/vtgate/vindexes.Column
 	{
-		size += int64(cap(cached.Columns)) * int64(44)
+		size += int64(cap(cached.Columns)) * int64(48)
 		for _, elem := range cached.Columns {
 			size += elem.CachedSize(false)
 		}

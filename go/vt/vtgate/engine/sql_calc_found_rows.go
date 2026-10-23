@@ -26,28 +26,28 @@ import (
 
 var _ Primitive = (*SQLCalcFoundRows)(nil)
 
-//SQLCalcFoundRows is a primitive to execute limit and count query as per their individual plan.
+// SQLCalcFoundRows is a primitive to execute limit and count query as per their individual plan.
 type SQLCalcFoundRows struct {
 	LimitPrimitive Primitive
 	CountPrimitive Primitive
 }
 
-//RouteType implements the Primitive interface
+// RouteType implements the Primitive interface
 func (s SQLCalcFoundRows) RouteType() string {
 	return "SQLCalcFoundRows"
 }
 
-//GetKeyspaceName implements the Primitive interface
+// GetKeyspaceName implements the Primitive interface
 func (s SQLCalcFoundRows) GetKeyspaceName() string {
 	return s.LimitPrimitive.GetKeyspaceName()
 }
 
-//GetTableName implements the Primitive interface
+// GetTableName implements the Primitive interface
 func (s SQLCalcFoundRows) GetTableName() string {
 	return s.LimitPrimitive.GetTableName()
 }
 
-//Execute implements the Primitive interface
+// Execute implements the Primitive interface
 func (s SQLCalcFoundRows) Execute(vcursor VCursor, bindVars map[string]*querypb.BindVariable, wantfields bool) (*sqltypes.Result, error) {
 	limitQr, err := s.LimitPrimitive.Execute(vcursor, bindVars, wantfields)
 	if err != nil {
@@ -68,7 +68,7 @@ func (s SQLCalcFoundRows) Execute(vcursor VCursor, bindVars map[string]*querypb.
 	return limitQr, nil
 }
 
-//StreamExecute implements the Primitive interface
+// StreamExecute implements the Primitive interface
 func (s SQLCalcFoundRows) StreamExecute(vcursor VCursor, bindVars map[string]*querypb.BindVariable, wantfields bool, callback func(*sqltypes.Result) error) error {
 	err := s.LimitPrimitive.StreamExecute(vcursor, bindVars, wantfields, callback)
 	if err != nil {
@@ -102,17 +102,17 @@ func (s SQLCalcFoundRows) StreamExecute(vcursor VCursor, bindVars map[string]*qu
 	return nil
 }
 
-//GetFields implements the Primitive interface
+// GetFields implements the Primitive interface
 func (s SQLCalcFoundRows) GetFields(vcursor VCursor, bindVars map[string]*querypb.BindVariable) (*sqltypes.Result, error) {
 	return s.LimitPrimitive.GetFields(vcursor, bindVars)
 }
 
-//NeedsTransaction implements the Primitive interface
+// NeedsTransaction implements the Primitive interface
 func (s SQLCalcFoundRows) NeedsTransaction() bool {
 	return s.LimitPrimitive.NeedsTransaction()
 }
 
-//Inputs implements the Primitive interface
+// Inputs implements the Primitive interface
 func (s SQLCalcFoundRows) Inputs() []Primitive {
 	return []Primitive{s.LimitPrimitive, s.CountPrimitive}
 }

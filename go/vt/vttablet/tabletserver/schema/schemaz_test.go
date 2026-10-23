@@ -50,7 +50,10 @@ func TestSchamazHandler1(t *testing.T) {
 		`<td>id: INT32<br>next_id: INT64<br>cache: INT64<br>increment: INT64<br></td>`,
 		`<td>id<br></td>`,
 		`<td>sequence</td>`,
-		`<td>{{0 0} 0 0}&lt;nil&gt;</td>`,
+		// SequenceInfo is rendered with %v, which includes the embedded
+		// sync.Mutex. Its internal layout differs between Go versions, so
+		// only match the NextVal/LastVal part of the output.
+		`<td>{.* 0 0}&lt;nil&gt;</td>`,
 	}
 	matched, err = regexp.Match(strings.Join(seq, `\s*`), body)
 	require.NoError(t, err)

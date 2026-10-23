@@ -134,7 +134,7 @@ func testWaitForDrain(t *testing.T, desc, cells string, drain drainDirective, ex
 			break
 		}
 		line := logutil.EventString(le)
-		t.Logf(line)
+		t.Log(line)
 		if strings.Contains(line, "for all healthy tablets to be drained") {
 			t.Log("Successfully waited for WaitForDrain to be blocked because tablets have a QPS rate > 0.0")
 			break
@@ -159,7 +159,7 @@ func testWaitForDrain(t *testing.T, desc, cells string, drain drainDirective, ex
 	for {
 		le, err = stream.Recv()
 		if err == nil {
-			vp.t.Logf(logutil.EventString(le))
+			vp.t.Log(logutil.EventString(le))
 		} else {
 			break
 		}

@@ -17,7 +17,6 @@ limitations under the License.
 package discovery
 
 import (
-	"fmt"
 	"io"
 	"math/rand"
 	"sort"
@@ -170,7 +169,7 @@ func NewTabletPicker(
 	}
 	if len(missingFields) > 0 {
 		return nil, vterrors.Errorf(vtrpcpb.Code_FAILED_PRECONDITION,
-			fmt.Sprintf("Missing required field(s) for tablet picker: %s", strings.Join(missingFields, ", ")))
+			"Missing required field(s) for tablet picker: %s", strings.Join(missingFields, ", "))
 	}
 
 	// Resolve tablet picker options

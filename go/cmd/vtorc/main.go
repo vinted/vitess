@@ -90,7 +90,7 @@ func main() {
 	if GitCommit != "" {
 		startText += ", git commit: " + GitCommit
 	}
-	log.Info(startText)
+	log.Info("%s", startText)
 
 	if len(*configFile) > 0 {
 		config.ForceRead(*configFile)

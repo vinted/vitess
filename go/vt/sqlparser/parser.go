@@ -46,8 +46,9 @@ var MySQLVersion string = "50709"
 //
 // N.B: Parser pooling means that you CANNOT take references directly to parse stack variables (e.g.
 // $$ = &$4) in sql.y rules. You must instead add an intermediate reference like so:
-//    showCollationFilterOpt := $4
-//    $$ = &Show{Type: string($2), ShowCollationFilterOpt: &showCollationFilterOpt}
+//
+//	showCollationFilterOpt := $4
+//	$$ = &Show{Type: string($2), ShowCollationFilterOpt: &showCollationFilterOpt}
 func yyParsePooled(yylex yyLexer) int {
 	parser := parserPool.Get().(*yyParserImpl)
 	defer func() {
