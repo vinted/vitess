@@ -364,7 +364,7 @@ func (hw *reshardingWorkflowGen) workflowCreator(ctx context.Context, task *work
 
 func (hw *reshardingWorkflowGen) setUIMessage(node *workflow.Node, message string) {
 	log.Infof("Keyspace resharding : %v.", message)
-	hw.logger.Infof(message)
+	hw.logger.Infof("%s", message)
 	node.Log = hw.logger.String()
 	node.Message = message
 	node.BroadcastChanges(false /* updateChildren */)

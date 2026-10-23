@@ -339,7 +339,7 @@ func (wr *Wrangler) SwitchReads(ctx context.Context, targetKeyspace, workflowNam
 	if ts == nil {
 		errorMsg := fmt.Sprintf("workflow %s not found in keyspace %s", workflowName, targetKeyspace)
 		wr.Logger().Errorf(errorMsg)
-		return nil, fmt.Errorf(errorMsg)
+		return nil, errors.New(errorMsg)
 	}
 	log.Infof("SwitchReads: %s.%s tt %+v, cells %+v, workflow state: %+v", targetKeyspace, workflowName, servedTypes, cells, ws)
 	var switchReplicas, switchRdonly bool
@@ -482,7 +482,7 @@ func (wr *Wrangler) SwitchWrites(ctx context.Context, targetKeyspace, workflowNa
 	if ts == nil {
 		errorMsg := fmt.Sprintf("workflow %s not found in keyspace %s", workflowName, targetKeyspace)
 		wr.Logger().Errorf(errorMsg)
-		return 0, nil, fmt.Errorf(errorMsg)
+		return 0, nil, errors.New(errorMsg)
 	}
 
 	var sw iswitcher
@@ -1457,7 +1457,7 @@ func doValidateWorkflowHasCompleted(ctx context.Context, ts *trafficSwitcher) er
 		_ = ts.ForAllSources(func(source *workflow.MigrationSource) error {
 			wg.Add(1)
 			if source.GetShard().IsMasterServing {
-				rec.RecordError(fmt.Errorf(fmt.Sprintf("Shard %s is still serving", source.GetShard().ShardName())))
+				rec.RecordError(fmt.Errorf("Shard %s is still serving", source.GetShard().ShardName()))
 			}
 			wg.Done()
 			return nil

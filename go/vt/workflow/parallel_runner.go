@@ -416,7 +416,7 @@ func (p *ParallelRunner) setFinishUIMessage(taskID string) {
 }
 
 func (p *ParallelRunner) setUIMessage(message string) {
-	p.uiLogger.Infof(message)
+	p.uiLogger.Infof("%s", message)
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
