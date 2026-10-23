@@ -158,7 +158,7 @@ func (a *analyzer) resolveColumn(colName *sqlparser.ColName, current *scope) (Ta
 		return 0, err
 	}
 	if t == nil {
-		return 0, vterrors.NewErrorf(vtrpcpb.Code_INVALID_ARGUMENT, vterrors.NonUniqError, fmt.Sprintf("Column '%s' in field list is ambiguous", sqlparser.String(colName)))
+		return 0, vterrors.NewErrorf(vtrpcpb.Code_INVALID_ARGUMENT, vterrors.NonUniqError, "Column '%s' in field list is ambiguous", sqlparser.String(colName))
 	}
 	return a.tableSetFor(t.ASTNode), nil
 }
@@ -191,12 +191,12 @@ func (a *analyzer) resolveUnQualifiedColumn(current *scope, expr *sqlparser.ColN
 	var tblInfo *TableInfo
 	for _, tbl := range current.tables {
 		if tbl.Table == nil {
-			return nil, vterrors.NewErrorf(vtrpcpb.Code_INVALID_ARGUMENT, vterrors.NonUniqError, fmt.Sprintf("Column '%s' in field list is ambiguous", sqlparser.String(expr)))
+			return nil, vterrors.NewErrorf(vtrpcpb.Code_INVALID_ARGUMENT, vterrors.NonUniqError, "Column '%s' in field list is ambiguous", sqlparser.String(expr))
 		}
 		for _, col := range tbl.Table.Columns {
 			if expr.Name.Equal(col.Name) {
 				if tblInfo != nil {
-					return nil, vterrors.NewErrorf(vtrpcpb.Code_INVALID_ARGUMENT, vterrors.NonUniqError, fmt.Sprintf("Column '%s' in field list is ambiguous", sqlparser.String(expr)))
+					return nil, vterrors.NewErrorf(vtrpcpb.Code_INVALID_ARGUMENT, vterrors.NonUniqError, "Column '%s' in field list is ambiguous", sqlparser.String(expr))
 				}
 				tblInfo = tbl
 			}
