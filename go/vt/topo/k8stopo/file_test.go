@@ -49,8 +49,19 @@ func Test_packValue(t *testing.T) {
 				t.Errorf("packValue() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("packValue() = %v, want %v", got, tt.want)
+			// The exact compressed bytes depend on the compress/flate
+			// implementation of the Go release, so compare the decoded
+			// payloads rather than the encoded bytes.
+			gotUnpacked, err := unpackValue(got)
+			if err != nil {
+				t.Fatalf("unpackValue(packValue()) error = %v", err)
+			}
+			wantUnpacked, err := unpackValue(tt.want)
+			if err != nil {
+				t.Fatalf("unpackValue(want) error = %v", err)
+			}
+			if !reflect.DeepEqual(gotUnpacked, wantUnpacked) {
+				t.Errorf("packValue() = %v, want %v", gotUnpacked, wantUnpacked)
 			}
 		})
 	}
