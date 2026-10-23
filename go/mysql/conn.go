@@ -654,7 +654,7 @@ func (c *Conn) writeComQuit() error {
 	data, pos := c.startEphemeralPacketWithHeader(1)
 	data[pos] = ComQuit
 	if err := c.writeEphemeralPacket(); err != nil {
-		return NewSQLError(CRServerGone, SSUnknownSQLState, err.Error())
+		return NewSQLError(CRServerGone, SSUnknownSQLState, "%v", err)
 	}
 	return nil
 }
