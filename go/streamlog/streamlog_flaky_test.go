@@ -103,23 +103,30 @@ func TestHTTP(t *testing.T) {
 	body = nil
 
 	// Due to multiple layers of buffering in http.Server, we must
-	// send multiple messages to detect the client has gone away.
-	// 4 seems to be a minimum, but doesn't always work. So 10 it is.
+	// send multiple messages to detect the client has gone away. The
+	// client side tears the connection down asynchronously, so keep
+	// sending until the handler notices or we give up.
 	logger.mu.Lock()
 	if want, got := 1, len(logger.subscribed); want != got {
 		t.Errorf("len(logger.subscribed) = %v, want %v", got, want)
 	}
 	logger.mu.Unlock()
-	for i := 0; i < 10; i++ {
+	deadline := time.Now().Add(5 * time.Second)
+	for {
 		logger.Send(&logMessage{"val3"})
 		// Allow time for propagation (loopback interface - expected to be fast).
 		time.Sleep(1 * time.Millisecond)
+		logger.mu.Lock()
+		got := len(logger.subscribed)
+		logger.mu.Unlock()
+		if got == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Errorf("len(logger.subscribed) = %v, want %v", got, 0)
+			break
+		}
 	}
-	logger.mu.Lock()
-	if want, got := 0, len(logger.subscribed); want != got {
-		t.Errorf("len(logger.subscribed) = %v, want %v", got, want)
-	}
-	logger.mu.Unlock()
 }
 
 func TestChannel(t *testing.T) {
