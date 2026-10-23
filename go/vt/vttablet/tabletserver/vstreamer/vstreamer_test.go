@@ -577,7 +577,7 @@ func TestVStreamCopyWithDifferentFilters(t *testing.T) {
 	}()
 	wg.Wait()
 	if errGoroutine != nil {
-		t.Fatalf(errGoroutine.Error())
+		t.Fatal(errGoroutine)
 	}
 }
 

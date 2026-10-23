@@ -149,7 +149,7 @@ func (sc *StatefulConnection) unlock(updateTime bool) {
 // Release is used when the connection will not be used ever again.
 // The underlying dbConn is removed so that this connection cannot be used by mistake.
 func (sc *StatefulConnection) Release(reason tx.ReleaseReason) {
-	sc.Releasef(reason.String())
+	sc.Releasef("%s", reason.String())
 }
 
 // Releasef is used when the connection will not be used ever again.
