@@ -23,7 +23,7 @@ import (
 
 var _ Primitive = (*Rows)(nil)
 
-//Rows simply returns a number or rows
+// Rows simply returns a number or rows
 type Rows struct {
 	rows   [][]sqltypes.Value
 	fields []*querypb.Field
@@ -32,27 +32,27 @@ type Rows struct {
 	noTxNeeded
 }
 
-//NewRowsPrimitive returns a new Rows primitie
+// NewRowsPrimitive returns a new Rows primitie
 func NewRowsPrimitive(rows [][]sqltypes.Value, fields []*querypb.Field) *Rows {
 	return &Rows{rows: rows, fields: fields}
 }
 
-//RouteType implements the Primitive interface
+// RouteType implements the Primitive interface
 func (r *Rows) RouteType() string {
 	return "Rows"
 }
 
-//GetKeyspaceName implements the Primitive interface
+// GetKeyspaceName implements the Primitive interface
 func (r *Rows) GetKeyspaceName() string {
 	return ""
 }
 
-//GetTableName implements the Primitive interface
+// GetTableName implements the Primitive interface
 func (r *Rows) GetTableName() string {
 	return ""
 }
 
-//Execute implements the Primitive interface
+// Execute implements the Primitive interface
 func (r *Rows) Execute(VCursor, map[string]*querypb.BindVariable, bool) (*sqltypes.Result, error) {
 	return &sqltypes.Result{
 		Fields:   r.fields,
@@ -61,7 +61,7 @@ func (r *Rows) Execute(VCursor, map[string]*querypb.BindVariable, bool) (*sqltyp
 	}, nil
 }
 
-//StreamExecute implements the Primitive interface
+// StreamExecute implements the Primitive interface
 func (r *Rows) StreamExecute(vcursor VCursor, bindVars map[string]*querypb.BindVariable, wantields bool, callback func(*sqltypes.Result) error) error {
 	result, err := r.Execute(vcursor, bindVars, wantields)
 	if err != nil {
@@ -70,7 +70,7 @@ func (r *Rows) StreamExecute(vcursor VCursor, bindVars map[string]*querypb.BindV
 	return callback(result)
 }
 
-//GetFields implements the Primitive interface
+// GetFields implements the Primitive interface
 func (r *Rows) GetFields(VCursor, map[string]*querypb.BindVariable) (*sqltypes.Result, error) {
 	return &sqltypes.Result{
 		Fields:   r.fields,

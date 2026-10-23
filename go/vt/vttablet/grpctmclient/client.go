@@ -801,9 +801,7 @@ func (client *Client) PromoteReplica(ctx context.Context, tablet *topodatapb.Tab
 	return response.Position, nil
 }
 
-//
 // Backup related methods
-//
 type backupStreamAdapter struct {
 	stream tabletmanagerservicepb.TabletManager_BackupClient
 	cc     *grpc.ClientConn

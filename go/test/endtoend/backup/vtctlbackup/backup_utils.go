@@ -268,14 +268,14 @@ func TestBackup(t *testing.T, setupType int, streamMode string, stripes int) {
 
 type restoreMethod func(t *testing.T, tablet *cluster.Vttablet)
 
-//- create a shard with master and replica1 only
-//- run InitShardMaster
-//- insert some data
-//- take a backup on master
-//- insert more data on the master
-//- bring up tablet_replica2 after the fact, let it restore the backup
-//- check all data is right (before+after backup data)
-//- list the backup, remove it
+// - create a shard with master and replica1 only
+// - run InitShardMaster
+// - insert some data
+// - take a backup on master
+// - insert more data on the master
+// - bring up tablet_replica2 after the fact, let it restore the backup
+// - check all data is right (before+after backup data)
+// - list the backup, remove it
 func masterBackup(t *testing.T) {
 	verifyInitialReplication(t)
 
@@ -309,10 +309,10 @@ func masterBackup(t *testing.T) {
 	require.Nil(t, err)
 }
 
-//    Test a master and replica from the same backup.
+// Test a master and replica from the same backup.
 //
-//    Check that a replica and master both restored from the same backup
-//    can replicate successfully.
+// Check that a replica and master both restored from the same backup
+// can replicate successfully.
 func masterReplicaSameBackup(t *testing.T) {
 	// insert data on master, wait for replica to get it
 	verifyInitialReplication(t)
@@ -378,16 +378,15 @@ func restoreOldMasterInPlace(t *testing.T) {
 	testRestoreOldMaster(t, restoreInPlace)
 }
 
-//Test that a former master replicates correctly after being restored.
+// Test that a former master replicates correctly after being restored.
 //
-//- Take a backup.
-//- Reparent from old master to new master.
-//- Force old master to restore from a previous backup using restore_method.
+// - Take a backup.
+// - Reparent from old master to new master.
+// - Force old master to restore from a previous backup using restore_method.
 //
-//Args:
-//restore_method: function accepting one parameter of type tablet.Tablet,
-//this function is called to force a restore on the provided tablet
-//
+// Args:
+// restore_method: function accepting one parameter of type tablet.Tablet,
+// this function is called to force a restore on the provided tablet
 func testRestoreOldMaster(t *testing.T, method restoreMethod) {
 	// insert data on master, wait for replica to get it
 	verifyInitialReplication(t)
@@ -536,21 +535,19 @@ func terminatedRestore(t *testing.T) {
 	stopAllTablets()
 }
 
-//test_backup will:
-//- create a shard with master and replica1 only
-//- run InitShardMaster
-//- bring up tablet_replica2 concurrently, telling it to wait for a backup
-//- insert some data
-//- take a backup
-//- insert more data on the master
-//- wait for tablet_replica2 to become SERVING
-//- check all data is right (before+after backup data)
-//- list the backup, remove it
+// test_backup will:
+// - create a shard with master and replica1 only
+// - run InitShardMaster
+// - bring up tablet_replica2 concurrently, telling it to wait for a backup
+// - insert some data
+// - take a backup
+// - insert more data on the master
+// - wait for tablet_replica2 to become SERVING
+// - check all data is right (before+after backup data)
+// - list the backup, remove it
 //
-//Args:
-//tablet_type: 'replica' or 'rdonly'.
-//
-//
+// Args:
+// tablet_type: 'replica' or 'rdonly'.
 func vtctlBackup(t *testing.T, tabletType string) {
 	restoreWaitForBackup(t, tabletType)
 	verifyInitialReplication(t)

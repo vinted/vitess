@@ -162,7 +162,7 @@ func (l *Limit) Inputs() []Primitive {
 	return []Primitive{l.Input}
 }
 
-//NeedsTransaction implements the Primitive interface.
+// NeedsTransaction implements the Primitive interface.
 func (l *Limit) NeedsTransaction() bool {
 	return l.Input.NeedsTransaction()
 }

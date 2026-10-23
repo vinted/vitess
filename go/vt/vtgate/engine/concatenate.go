@@ -28,12 +28,12 @@ import (
 // Concatenate Primitive is used to concatenate results from multiple sources.
 var _ Primitive = (*Concatenate)(nil)
 
-//Concatenate specified the parameter for concatenate primitive
+// Concatenate specified the parameter for concatenate primitive
 type Concatenate struct {
 	Sources []Primitive
 }
 
-//RouteType returns a description of the query routing type used by the primitive
+// RouteType returns a description of the query routing type used by the primitive
 func (c *Concatenate) RouteType() string {
 	return "Concatenate"
 }
@@ -214,7 +214,7 @@ func (c *Concatenate) GetFields(vcursor VCursor, bindVars map[string]*querypb.Bi
 	return res, nil
 }
 
-//NeedsTransaction returns whether a transaction is needed for this primitive
+// NeedsTransaction returns whether a transaction is needed for this primitive
 func (c *Concatenate) NeedsTransaction() bool {
 	for _, source := range c.Sources {
 		if source.NeedsTransaction() {
