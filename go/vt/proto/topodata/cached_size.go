@@ -25,6 +25,8 @@ func (cached *KeyRange) CachedSize(alloc bool) int64 {
 	if alloc {
 		size += int64(88)
 	}
+	// field unknownFields google.golang.org/protobuf/runtime/protoimpl.UnknownFields
+	size += int64(cap(cached.unknownFields))
 	// field Start []byte
 	size += int64(cap(cached.Start))
 	// field End []byte

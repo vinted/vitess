@@ -25,9 +25,6 @@ func TestTypeSizes(t *testing.T) {
 	const PtrSize = 8
 	const SliceHeaderSize = 3 * PtrSize
 	const FatPointerSize = 2 * PtrSize
-	const BucketHeaderSize = 8
-	const BucketSize = 8
-	const HashMapHeaderSize = 48
 
 	cases := []struct {
 		obj  cachedObject
@@ -57,18 +54,21 @@ func TestTypeSizes(t *testing.T) {
 		{&Slice3{field1: []*Bimpl{{}}}, SliceHeaderSize + PtrSize*1 + 8*1},
 		{&Slice3{field1: []*Bimpl{{}, {}, {}, {}}}, SliceHeaderSize + PtrSize*4 + 8*4},
 
+		// Map sizes are computed by hack.RuntimeMapSize from the Swiss map
+		// implementation (Go 1.24+): a 48 byte map header plus, for
+		// non-empty maps, one 8-slot group rounded up to a malloc size class.
 		{&Map1{field1: nil}, PtrSize},
-		{&Map1{field1: map[uint8]uint8{}}, PtrSize + HashMapHeaderSize},
-		{&Map1{field1: map[uint8]uint8{0: 0}}, PtrSize + HashMapHeaderSize + BucketHeaderSize + 1*BucketSize + 1*BucketSize + PtrSize},
+		{&Map1{field1: map[uint8]uint8{}}, 56},
+		{&Map1{field1: map[uint8]uint8{0: 0}}, 80},
 
 		{&Map2{field1: nil}, PtrSize},
-		{&Map2{field1: map[uint64]A{}}, PtrSize + HashMapHeaderSize},
-		{&Map2{field1: map[uint64]A{0: {}}}, PtrSize + HashMapHeaderSize + BucketHeaderSize + 8*BucketSize + 16*BucketSize + PtrSize},
+		{&Map2{field1: map[uint64]A{}}, 56},
+		{&Map2{field1: map[uint64]A{0: {}}}, 264},
 
 		{&Map3{field1: nil}, PtrSize},
-		{&Map3{field1: map[uint64]B{}}, PtrSize + HashMapHeaderSize},
-		{&Map3{field1: map[uint64]B{0: &Bimpl{}}}, PtrSize + HashMapHeaderSize + BucketHeaderSize + 8*BucketSize + FatPointerSize*BucketSize + PtrSize + 8},
-		{&Map3{field1: map[uint64]B{0: nil}}, PtrSize + HashMapHeaderSize + BucketHeaderSize + 8*BucketSize + FatPointerSize*BucketSize + PtrSize},
+		{&Map3{field1: map[uint64]B{}}, 56},
+		{&Map3{field1: map[uint64]B{0: &Bimpl{}}}, 272},
+		{&Map3{field1: map[uint64]B{0: nil}}, 264},
 
 		{&String1{}, PtrSize*2 + 8},
 		{&String1{field1: "1234"}, PtrSize*2 + 8 + 4},

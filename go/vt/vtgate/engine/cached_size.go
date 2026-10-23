@@ -17,11 +17,7 @@ limitations under the License.
 
 package engine
 
-import (
-	"math"
-	"reflect"
-	"unsafe"
-)
+import hack "vitess.io/vitess/go/hack"
 
 type cachedObject interface {
 	CachedSize(alloc bool) int64
@@ -250,14 +246,7 @@ func (cached *Join) CachedSize(alloc bool) int64 {
 	}
 	// field Vars map[string]int
 	if cached.Vars != nil {
-		size += int64(48)
-		hmap := reflect.ValueOf(cached.Vars)
-		numBuckets := int(math.Pow(2, float64((*(*uint8)(unsafe.Pointer(hmap.Pointer() + uintptr(9)))))))
-		numOldBuckets := (*(*uint16)(unsafe.Pointer(hmap.Pointer() + uintptr(10))))
-		size += int64(numOldBuckets * 208)
-		if len(cached.Vars) > 0 || numBuckets > 1 {
-			size += int64(numBuckets * 208)
-		}
+		size += hack.RuntimeMapSize(cached.Vars)
 		for k := range cached.Vars {
 			size += int64(len(k))
 		}
@@ -805,14 +794,7 @@ func (cached *Update) CachedSize(alloc bool) int64 {
 	size += cached.DML.CachedSize(false)
 	// field ChangedVindexValues map[string]*vitess.io/vitess/go/vt/vtgate/engine.VindexValues
 	if cached.ChangedVindexValues != nil {
-		size += int64(48)
-		hmap := reflect.ValueOf(cached.ChangedVindexValues)
-		numBuckets := int(math.Pow(2, float64((*(*uint8)(unsafe.Pointer(hmap.Pointer() + uintptr(9)))))))
-		numOldBuckets := (*(*uint16)(unsafe.Pointer(hmap.Pointer() + uintptr(10))))
-		size += int64(numOldBuckets * 208)
-		if len(cached.ChangedVindexValues) > 0 || numBuckets > 1 {
-			size += int64(numBuckets * 208)
-		}
+		size += hack.RuntimeMapSize(cached.ChangedVindexValues)
 		for k, v := range cached.ChangedVindexValues {
 			size += int64(len(k))
 			size += v.CachedSize(true)
@@ -907,14 +889,7 @@ func (cached *VindexValues) CachedSize(alloc bool) int64 {
 	}
 	// field PvMap map[string]vitess.io/vitess/go/sqltypes.PlanValue
 	if cached.PvMap != nil {
-		size += int64(48)
-		hmap := reflect.ValueOf(cached.PvMap)
-		numBuckets := int(math.Pow(2, float64((*(*uint8)(unsafe.Pointer(hmap.Pointer() + uintptr(9)))))))
-		numOldBuckets := (*(*uint16)(unsafe.Pointer(hmap.Pointer() + uintptr(10))))
-		size += int64(numOldBuckets * 848)
-		if len(cached.PvMap) > 0 || numBuckets > 1 {
-			size += int64(numBuckets * 848)
-		}
+		size += hack.RuntimeMapSize(cached.PvMap)
 		for k, v := range cached.PvMap {
 			size += int64(len(k))
 			size += v.CachedSize(false)
@@ -938,14 +913,7 @@ func (cached *shardRoute) CachedSize(alloc bool) int64 {
 	size += cached.rs.CachedSize(true)
 	// field bv map[string]*vitess.io/vitess/go/vt/proto/query.BindVariable
 	if cached.bv != nil {
-		size += int64(48)
-		hmap := reflect.ValueOf(cached.bv)
-		numBuckets := int(math.Pow(2, float64((*(*uint8)(unsafe.Pointer(hmap.Pointer() + uintptr(9)))))))
-		numOldBuckets := (*(*uint16)(unsafe.Pointer(hmap.Pointer() + uintptr(10))))
-		size += int64(numOldBuckets * 208)
-		if len(cached.bv) > 0 || numBuckets > 1 {
-			size += int64(numBuckets * 208)
-		}
+		size += hack.RuntimeMapSize(cached.bv)
 		for k, v := range cached.bv {
 			size += int64(len(k))
 			size += v.CachedSize(true)

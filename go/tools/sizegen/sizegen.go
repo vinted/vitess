@@ -90,7 +90,7 @@ func newSizegen(mod *packages.Module, sizes types.Sizes) *sizegen {
 }
 
 func isPod(tt types.Type) bool {
-	switch tt := tt.(type) {
+	switch tt := types.Unalias(tt).(type) {
 	case *types.Struct:
 		for i := 0; i < tt.NumFields(); i++ {
 			if !isPod(tt.Field(i).Type()) {
@@ -269,54 +269,19 @@ func (sizegen *sizegen) sizeImplForStruct(name *types.TypeName, st *types.Struct
 	return f, funcFlags
 }
 
-func (sizegen *sizegen) sizeStmtForMap(fieldName *jen.Statement, m *types.Map) []jen.Code {
-	const bucketCnt = 8
-	const sizeofHmap = int64(6 * 8)
-
-	/*
-		type bmap struct {
-			// tophash generally contains the top byte of the hash value
-			// for each key in this bucket. If tophash[0] < minTopHash,
-			// tophash[0] is a bucket evacuation state instead.
-			tophash [bucketCnt]uint8
-			// Followed by bucketCnt keys and then bucketCnt elems.
-			// NOTE: packing all the keys together and then all the elems together makes the
-			// code a bit more complicated than alternating key/elem/key/elem/... but it allows
-			// us to eliminate padding which would be needed for, e.g., map[int64]int8.
-			// Followed by an overflow pointer.
-		}
-	*/
-	sizeOfBucket := int(
-		bucketCnt + // tophash
-			bucketCnt*sizegen.sizes.Sizeof(m.Key()) +
-			bucketCnt*sizegen.sizes.Sizeof(m.Elem()) +
-			8, // overflow pointer
-	)
-
+func (sizegen *sizegen) sizeStmtForMap(fieldName *jen.Statement) []jen.Code {
+	// The internal layout of Go maps changed with the Swiss map implementation
+	// in Go 1.24, so the size is computed at runtime by hack.RuntimeMapSize
+	// instead of reading the runtime's map header at fixed offsets.
 	return []jen.Code{
-		jen.Id("size").Op("+=").Lit(sizeofHmap),
-
-		jen.Id("hmap").Op(":=").Qual("reflect", "ValueOf").Call(fieldName),
-
-		jen.Id("numBuckets").Op(":=").Id("int").Call(
-			jen.Qual("math", "Pow").Call(jen.Lit(2), jen.Id("float64").Call(
-				jen.Parens(jen.Op("*").Parens(jen.Op("*").Id("uint8")).Call(
-					jen.Qual("unsafe", "Pointer").Call(jen.Id("hmap").Dot("Pointer").Call().
-						Op("+").Id("uintptr").Call(jen.Lit(9)))))))),
-
-		jen.Id("numOldBuckets").Op(":=").Parens(jen.Op("*").Parens(jen.Op("*").Id("uint16")).Call(
-			jen.Qual("unsafe", "Pointer").Call(
-				jen.Id("hmap").Dot("Pointer").Call().Op("+").Id("uintptr").Call(jen.Lit(10))))),
-
-		jen.Id("size").Op("+=").Id("int64").Call(jen.Id("numOldBuckets").Op("*").Lit(sizeOfBucket)),
-
-		jen.If(jen.Id("len").Call(fieldName).Op(">").Lit(0).Op("||").Id("numBuckets").Op(">").Lit(1)).Block(
-			jen.Id("size").Op("+=").Id("int64").Call(
-				jen.Id("numBuckets").Op("*").Lit(sizeOfBucket))),
+		jen.Id("size").Op("+=").Qual("vitess.io/vitess/go/hack", "RuntimeMapSize").Call(fieldName),
 	}
 }
 
 func (sizegen *sizegen) sizeStmtForType(fieldName *jen.Statement, field types.Type, alloc bool) (jen.Code, codeFlag) {
+	// Since Go 1.23 go/types materializes type aliases (e.g. `any`) as
+	// *types.Alias; size them as the type they stand for.
+	field = types.Unalias(field)
 	if sizegen.sizes.Sizeof(field) == 0 {
 		return nil, 0
 	}
@@ -354,7 +319,7 @@ func (sizegen *sizegen) sizeStmtForType(fieldName *jen.Statement, field types.Ty
 		valSize, valFlag := sizegen.sizeStmtForType(jen.Id("v"), node.Elem(), false)
 
 		return jen.If(fieldName.Clone().Op("!=").Nil()).BlockFunc(func(block *jen.Group) {
-			for _, stmt := range sizegen.sizeStmtForMap(fieldName, node) {
+			for _, stmt := range sizegen.sizeStmtForMap(fieldName) {
 				block.Add(stmt)
 			}
 

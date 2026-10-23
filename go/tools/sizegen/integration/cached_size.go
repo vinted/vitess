@@ -17,11 +17,7 @@ limitations under the License.
 
 package integration
 
-import (
-	"math"
-	"reflect"
-	"unsafe"
-)
+import hack "vitess.io/vitess/go/hack"
 
 type cachedObject interface {
 	CachedSize(alloc bool) int64
@@ -87,14 +83,7 @@ func (cached *Map1) CachedSize(alloc bool) int64 {
 	}
 	// field field1 map[uint8]uint8
 	if cached.field1 != nil {
-		size += int64(48)
-		hmap := reflect.ValueOf(cached.field1)
-		numBuckets := int(math.Pow(2, float64((*(*uint8)(unsafe.Pointer(hmap.Pointer() + uintptr(9)))))))
-		numOldBuckets := (*(*uint16)(unsafe.Pointer(hmap.Pointer() + uintptr(10))))
-		size += int64(numOldBuckets * 32)
-		if len(cached.field1) > 0 || numBuckets > 1 {
-			size += int64(numBuckets * 32)
-		}
+		size += hack.RuntimeMapSize(cached.field1)
 	}
 	return size
 }
@@ -110,14 +99,7 @@ func (cached *Map2) CachedSize(alloc bool) int64 {
 	}
 	// field field1 map[uint64]vitess.io/vitess/go/tools/sizegen/integration.A
 	if cached.field1 != nil {
-		size += int64(48)
-		hmap := reflect.ValueOf(cached.field1)
-		numBuckets := int(math.Pow(2, float64((*(*uint8)(unsafe.Pointer(hmap.Pointer() + uintptr(9)))))))
-		numOldBuckets := (*(*uint16)(unsafe.Pointer(hmap.Pointer() + uintptr(10))))
-		size += int64(numOldBuckets * 208)
-		if len(cached.field1) > 0 || numBuckets > 1 {
-			size += int64(numBuckets * 208)
-		}
+		size += hack.RuntimeMapSize(cached.field1)
 	}
 	return size
 }
@@ -133,14 +115,7 @@ func (cached *Map3) CachedSize(alloc bool) int64 {
 	}
 	// field field1 map[uint64]vitess.io/vitess/go/tools/sizegen/integration.B
 	if cached.field1 != nil {
-		size += int64(48)
-		hmap := reflect.ValueOf(cached.field1)
-		numBuckets := int(math.Pow(2, float64((*(*uint8)(unsafe.Pointer(hmap.Pointer() + uintptr(9)))))))
-		numOldBuckets := (*(*uint16)(unsafe.Pointer(hmap.Pointer() + uintptr(10))))
-		size += int64(numOldBuckets * 208)
-		if len(cached.field1) > 0 || numBuckets > 1 {
-			size += int64(numBuckets * 208)
-		}
+		size += hack.RuntimeMapSize(cached.field1)
 		for _, v := range cached.field1 {
 			if cc, ok := v.(cachedObject); ok {
 				size += cc.CachedSize(true)

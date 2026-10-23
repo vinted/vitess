@@ -17,11 +17,7 @@ limitations under the License.
 
 package vindexes
 
-import (
-	"math"
-	"reflect"
-	"unsafe"
-)
+import hack "vitess.io/vitess/go/hack"
 
 type cachedObject interface {
 	CachedSize(alloc bool) int64
@@ -292,14 +288,7 @@ func (cached *NumericStaticMap) CachedSize(alloc bool) int64 {
 	size += int64(len(cached.name))
 	// field lookup vitess.io/vitess/go/vt/vtgate/vindexes.NumericLookupTable
 	if cached.lookup != nil {
-		size += int64(48)
-		hmap := reflect.ValueOf(cached.lookup)
-		numBuckets := int(math.Pow(2, float64((*(*uint8)(unsafe.Pointer(hmap.Pointer() + uintptr(9)))))))
-		numOldBuckets := (*(*uint16)(unsafe.Pointer(hmap.Pointer() + uintptr(10))))
-		size += int64(numOldBuckets * 144)
-		if len(cached.lookup) > 0 || numBuckets > 1 {
-			size += int64(numBuckets * 144)
-		}
+		size += hack.RuntimeMapSize(cached.lookup)
 	}
 	return size
 }
@@ -329,14 +318,7 @@ func (cached *RegionJSON) CachedSize(alloc bool) int64 {
 	size += int64(len(cached.name))
 	// field regionMap vitess.io/vitess/go/vt/vtgate/vindexes.RegionMap
 	if cached.regionMap != nil {
-		size += int64(48)
-		hmap := reflect.ValueOf(cached.regionMap)
-		numBuckets := int(math.Pow(2, float64((*(*uint8)(unsafe.Pointer(hmap.Pointer() + uintptr(9)))))))
-		numOldBuckets := (*(*uint16)(unsafe.Pointer(hmap.Pointer() + uintptr(10))))
-		size += int64(numOldBuckets * 208)
-		if len(cached.regionMap) > 0 || numBuckets > 1 {
-			size += int64(numBuckets * 208)
-		}
+		size += hack.RuntimeMapSize(cached.regionMap)
 		for k := range cached.regionMap {
 			size += int64(len(k))
 		}
