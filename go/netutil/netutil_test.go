@@ -18,7 +18,6 @@ package netutil
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"reflect"
 	"testing"
@@ -32,7 +31,10 @@ func checkDistribution(t *testing.T, data []*net.SRV, margin float64) {
 
 	results := make(map[string]int)
 
-	count := 1000
+	// rand.Seed is a no-op since Go 1.24, so the sequence is different on
+	// every run. Use enough samples for the margins below to be many
+	// standard deviations wide, so the test does not flake.
+	count := 100000
 	for j := 0; j < count; j++ {
 		d := make([]*net.SRV, len(data))
 		copy(d, data)
@@ -54,7 +56,6 @@ func checkDistribution(t *testing.T, data []*net.SRV, margin float64) {
 }
 
 func testUniformity(t *testing.T, size int, margin float64) {
-	rand.Seed(1)
 	data := make([]*net.SRV, size)
 	for i := 0; i < size; i++ {
 		data[i] = &net.SRV{Target: fmt.Sprintf("%c", 'a'+i), Weight: 1}
@@ -70,7 +71,6 @@ func TestUniformity(t *testing.T) {
 }
 
 func testWeighting(t *testing.T, margin float64) {
-	rand.Seed(1)
 	data := []*net.SRV{
 		{Target: "a", Weight: 60},
 		{Target: "b", Weight: 30},
