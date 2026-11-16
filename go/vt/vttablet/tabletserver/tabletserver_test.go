@@ -1778,6 +1778,23 @@ func TestHandleExecTabletError(t *testing.T) {
 	}
 }
 
+func TestConvertErrorCodeLockErrors(t *testing.T) {
+	tcases := []struct {
+		name string
+		err  error
+		want vtrpcpb.Code
+	}{
+		{"lock wait timeout", mysql.NewSQLError(mysql.ERLockWaitTimeout, mysql.SSUnknownSQLState, "Lock wait timeout exceeded; try restarting transaction"), vtrpcpb.Code_DEADLINE_EXCEEDED},
+		{"lock nowait", mysql.NewSQLError(mysql.ERLockNowait, mysql.SSUnknownSQLState, "Statement aborted because lock(s) could not be acquired immediately and NOWAIT is set."), vtrpcpb.Code_DEADLINE_EXCEEDED},
+		{"deadlock", mysql.NewSQLError(mysql.ERLockDeadlock, mysql.SSLockDeadlock, "Deadlock found when trying to get lock; try restarting transaction"), vtrpcpb.Code_ABORTED},
+	}
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, convertErrorCode(tc.err))
+		})
+	}
+}
+
 func TestTerseErrorsNonSQLError(t *testing.T) {
 	config := tabletenv.NewDefaultConfig()
 	config.TerseErrors = true

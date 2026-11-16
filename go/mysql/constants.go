@@ -352,6 +352,7 @@ const (
 
 	// deadline exceeded
 	ERLockWaitTimeout = 1205
+	ERLockNowait      = 3572
 
 	// unavailable
 	ERServerShutdown = 1053
