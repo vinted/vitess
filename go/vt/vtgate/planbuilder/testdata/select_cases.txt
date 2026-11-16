@@ -1810,3 +1810,107 @@ Gen4 plan same as above
     "Table": "information_schema.key_column_usage, information_schema.referential_constraints"
   }
 }
+
+# select for update skip locked from unsharded
+"select * from unsharded for update skip locked"
+{
+  "QueryType": "SELECT",
+  "Original": "select * from unsharded for update skip locked",
+  "Instructions": {
+    "OperatorType": "Route",
+    "Variant": "SelectUnsharded",
+    "Keyspace": {
+      "Name": "main",
+      "Sharded": false
+    },
+    "FieldQuery": "select * from unsharded where 1 != 1",
+    "Query": "select * from unsharded for update skip locked",
+    "Table": "unsharded"
+  }
+}
+
+
+# select for update nowait on single shard
+"select * from user where id = 1 for update nowait"
+{
+  "QueryType": "SELECT",
+  "Original": "select * from user where id = 1 for update nowait",
+  "Instructions": {
+    "OperatorType": "Route",
+    "Variant": "SelectEqualUnique",
+    "Keyspace": {
+      "Name": "user",
+      "Sharded": true
+    },
+    "FieldQuery": "select * from `user` where 1 != 1",
+    "Query": "select * from `user` where id = 1 for update nowait",
+    "Table": "`user`",
+    "Values": [
+      1
+    ],
+    "Vindex": "user_index"
+  }
+}
+
+
+# select for share skip locked scatter with limit
+"select id from user limit 10 for share skip locked"
+{
+  "QueryType": "SELECT",
+  "Original": "select id from user limit 10 for share skip locked",
+  "Instructions": {
+    "OperatorType": "Limit",
+    "Count": 10,
+    "Inputs": [
+      {
+        "OperatorType": "Route",
+        "Variant": "SelectScatter",
+        "Keyspace": {
+          "Name": "user",
+          "Sharded": true
+        },
+        "FieldQuery": "select id from `user` where 1 != 1",
+        "Query": "select id from `user` limit :__upper_limit for share skip locked",
+        "Table": "`user`"
+      }
+    ]
+  }
+}
+
+
+# select for share nowait cross-shard join
+"select user.col from user join music on user.col = music.col for share nowait"
+{
+  "QueryType": "SELECT",
+  "Original": "select user.col from user join music on user.col = music.col for share nowait",
+  "Instructions": {
+    "OperatorType": "Join",
+    "Variant": "Join",
+    "JoinColumnIndexes": "-1",
+    "TableName": "`user`, music",
+    "Inputs": [
+      {
+        "OperatorType": "Route",
+        "Variant": "SelectScatter",
+        "Keyspace": {
+          "Name": "user",
+          "Sharded": true
+        },
+        "FieldQuery": "select `user`.col from `user` where 1 != 1",
+        "Query": "select `user`.col from `user` for share nowait",
+        "Table": "`user`"
+      },
+      {
+        "OperatorType": "Route",
+        "Variant": "SelectScatter",
+        "Keyspace": {
+          "Name": "user",
+          "Sharded": true
+        },
+        "FieldQuery": "select 1 from music where 1 != 1",
+        "Query": "select 1 from music where music.col = :user_col for share nowait",
+        "Table": "music"
+      }
+    ]
+  }
+}
