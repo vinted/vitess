@@ -25,9 +25,14 @@ const (
 	SQLCalcFoundRowsStr = "sql_calc_found_rows "
 
 	// Select.Lock
-	NoLockStr    = ""
-	ForUpdateStr = " for update"
-	ShareModeStr = " lock in share mode"
+	NoLockStr              = ""
+	ForUpdateStr           = " for update"
+	ForUpdateNoWaitStr     = " for update nowait"
+	ForUpdateSkipLockedStr = " for update skip locked"
+	ForShareStr            = " for share"
+	ForShareNoWaitStr      = " for share nowait"
+	ForShareSkipLockedStr  = " for share skip locked"
+	ShareModeStr           = " lock in share mode"
 
 	// Select.Cache
 	SQLCacheStr   = "sql_cache "
@@ -260,7 +265,7 @@ const (
 	ReadWrite
 )
 
-//Constants for Enum type - IsolationLevel
+// Constants for Enum type - IsolationLevel
 const (
 	ReadUncommitted IsolationLevel = iota
 	ReadCommitted
@@ -307,6 +312,11 @@ const (
 	NoLock Lock = iota
 	ForUpdateLock
 	ShareModeLock
+	ForShareLock
+	ForShareLockNoWait
+	ForShareLockSkipLocked
+	ForUpdateLockNoWait
+	ForUpdateLockSkipLocked
 )
 
 // Constants for Enum Type - WhereType

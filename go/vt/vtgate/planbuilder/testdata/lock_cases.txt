@@ -1,3 +1,77 @@
+# select nowait
+"select u.col, u.bar from user u join music m on u.foo = m.foo for update nowait"
+{
+  "QueryType": "SELECT",
+  "Original": "select u.col, u.bar from user u join music m on u.foo = m.foo for update nowait",
+  "Instructions": {
+    "OperatorType": "Join",
+    "Variant": "Join",
+    "JoinColumnIndexes": "-1,-2",
+    "TableName": "`user`, music",
+    "Inputs": [
+      {
+        "OperatorType": "Route",
+        "Variant": "SelectScatter",
+        "Keyspace": {
+          "Name": "user",
+          "Sharded": true
+        },
+        "FieldQuery": "select u.col, u.bar, u.foo from `user` as u where 1 != 1",
+        "Query": "select u.col, u.bar, u.foo from `user` as u for update nowait",
+        "Table": "`user`"
+      },
+      {
+        "OperatorType": "Route",
+        "Variant": "SelectScatter",
+        "Keyspace": {
+          "Name": "user",
+          "Sharded": true
+        },
+        "FieldQuery": "select 1 from music as m where 1 != 1",
+        "Query": "select 1 from music as m where m.foo = :u_foo for update nowait",
+        "Table": "music"
+      }
+    ]
+  }
+}
+
+# select skip locked
+"select u.col, u.bar from user u join music m on u.foo = m.foo for share skip locked"
+{
+  "QueryType": "SELECT",
+  "Original": "select u.col, u.bar from user u join music m on u.foo = m.foo for share skip locked",
+  "Instructions": {
+    "OperatorType": "Join",
+    "Variant": "Join",
+    "JoinColumnIndexes": "-1,-2",
+    "TableName": "`user`, music",
+    "Inputs": [
+      {
+        "OperatorType": "Route",
+        "Variant": "SelectScatter",
+        "Keyspace": {
+          "Name": "user",
+          "Sharded": true
+        },
+        "FieldQuery": "select u.col, u.bar, u.foo from `user` as u where 1 != 1",
+        "Query": "select u.col, u.bar, u.foo from `user` as u for share skip locked",
+        "Table": "`user`"
+      },
+      {
+        "OperatorType": "Route",
+        "Variant": "SelectScatter",
+        "Keyspace": {
+          "Name": "user",
+          "Sharded": true
+        },
+        "FieldQuery": "select 1 from music as m where 1 != 1",
+        "Query": "select 1 from music as m where m.foo = :u_foo for share skip locked",
+        "Table": "music"
+      }
+    ]
+  }
+}
+
 # get_lock from dual
 "select get_lock('xyz', 10) from dual"
 {
