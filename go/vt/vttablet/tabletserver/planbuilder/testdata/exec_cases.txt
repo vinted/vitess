@@ -224,6 +224,81 @@
   "FullQuery": "select eid from a limit :#maxLimit lock in share mode"
 }
 
+# for update nowait
+"select eid from a for update nowait"
+{
+  "PlanID": "Select",
+  "TableName": "a",
+  "Permissions": [
+    {
+      "TableName": "a",
+      "Role": 0
+    }
+  ],
+  "FieldQuery": "select eid from a where 1 != 1",
+  "FullQuery": "select eid from a limit :#maxLimit for update nowait"
+}
+
+# for update skip locked
+"select eid from a for update skip locked"
+{
+  "PlanID": "Select",
+  "TableName": "a",
+  "Permissions": [
+    {
+      "TableName": "a",
+      "Role": 0
+    }
+  ],
+  "FieldQuery": "select eid from a where 1 != 1",
+  "FullQuery": "select eid from a limit :#maxLimit for update skip locked"
+}
+
+# for share
+"select eid from a for share"
+{
+  "PlanID": "Select",
+  "TableName": "a",
+  "Permissions": [
+    {
+      "TableName": "a",
+      "Role": 0
+    }
+  ],
+  "FieldQuery": "select eid from a where 1 != 1",
+  "FullQuery": "select eid from a limit :#maxLimit for share"
+}
+
+# for share nowait
+"select eid from a for share nowait"
+{
+  "PlanID": "Select",
+  "TableName": "a",
+  "Permissions": [
+    {
+      "TableName": "a",
+      "Role": 0
+    }
+  ],
+  "FieldQuery": "select eid from a where 1 != 1",
+  "FullQuery": "select eid from a limit :#maxLimit for share nowait"
+}
+
+# for share skip locked
+"select eid from a for share skip locked"
+{
+  "PlanID": "Select",
+  "TableName": "a",
+  "Permissions": [
+    {
+      "TableName": "a",
+      "Role": 0
+    }
+  ],
+  "FieldQuery": "select eid from a where 1 != 1",
+  "FullQuery": "select eid from a limit :#maxLimit for share skip locked"
+}
+
 # normal insert
 "insert into a(eid, id) values (1, 2)"
 {

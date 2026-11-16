@@ -150,6 +150,13 @@ var (
 		input:  "select /* union order by limit lock */ 1 from t union select 1 from t order by a limit 1 for update",
 		output: "select /* union order by limit lock */ 1 from t union select 1 from t order by a asc limit 1 for update",
 	}, {
+		input: "select /* union lock skip locked */ 1 from t union select 1 from t for update skip locked",
+	}, {
+		input:  "select /* union order by limit lock nowait */ 1 from t union select 1 from t order by a limit 1 for share nowait",
+		output: "select /* union order by limit lock nowait */ 1 from t union select 1 from t order by a asc limit 1 for share nowait",
+	}, {
+		input: "select /* union all lock */ 1 from t union all select 1 from t for share skip locked",
+	}, {
 		input: "select /* union with limit on lhs */ 1 from t limit 1 union select 1 from t",
 	}, {
 		input:  "(select id, a from t order by id limit 1) union (select id, b as a from s order by id limit 1) order by a limit 1",
