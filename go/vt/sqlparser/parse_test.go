@@ -186,7 +186,17 @@ var (
 	}, {
 		input: "select /* straight_join */ straight_join 1 from t",
 	}, {
+		input: "select /* for share */ 1 from t for share",
+	}, {
+		input: "select /* for share */ 1 from t for share nowait",
+	}, {
+		input: "select /* for share */ 1 from t for share skip locked",
+	}, {
 		input: "select /* for update */ 1 from t for update",
+	}, {
+		input: "select /* for update */ 1 from t for update nowait",
+	}, {
+		input: "select /* for update */ 1 from t for update skip locked",
 	}, {
 		input: "select /* lock in share mode */ 1 from t lock in share mode",
 	}, {
@@ -3281,16 +3291,6 @@ var (
 	}, {
 		input:  "select /* straight_join using */ 1 from t1 straight_join t2 using (a)",
 		output: "syntax error at position 66 near 'using'",
-	}, {
-		input: "select /* for share */ 1 from t for share",
-	}, {
-		input: "select /* for share */ 1 from t for share nowait",
-	}, {
-		input: "select /* for share */ 1 from t for share skip locked",
-	}, {
-		input: "select /* for update */ 1 from t for update nowait",
-	}, {
-		input: "select /* for update */ 1 from t for update skip locked",
 	}, {
 		input:        "select 'aa",
 		output:       "syntax error at position 11 near 'aa'",
